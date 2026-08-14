@@ -55,7 +55,36 @@ int main(int argc, char **argv)
 			// 1. Setup poll() --> ??Should we use epoll or poll;
 			// 2. Check pollFds
 
-			//int clientFd = accept(server.getSocketFd(),);
+			struct sockaddr_in clientAddr;
+			socklen_t len = sizeof(clientAddr);
+			
+			int clientFd = accept(server.getSocketFd(), (struct sockaddr*)&clientAddr, &len);
+			if (clientFd == -1)
+			{
+				std::cerr << "Error at accepting client" << std::endl;
+				continue;
+			}
+
+			std::cout << "A new client connected." << std::endl;
+
+			char buffer[1024] = {0};
+
+			ssize_t bytesReceived = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
+
+			if (bytesReceived > 0)
+			{
+				std::cout << "Receiving from client: " << buffer << std::endl;
+				// do sth?
+			}
+			else if (bytesReceived == 0)
+			{
+				std::cout << "Client has disconnected before sending all the data";
+			}
+			else
+			{
+				std::cerr << "Socket error during recv." << std::endl;
+			}
+
 		}
 	}
 	catch(const std::exception& e)
