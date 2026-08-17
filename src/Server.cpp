@@ -42,7 +42,7 @@ void Server::start(void)
 	// maybe config file contents goes here?
 	sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(8080);
+	serverAddress.sin_port = htons(8082);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(this->_socketFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)

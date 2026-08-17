@@ -65,6 +65,7 @@ bool	receiveClientData(int fd, std::vector<struct pollfd>& pollfds)
 	if (bytesReceived > 0)
 	{
 		std::cout << "Receiving from client: " << buffer << std::endl;
+		std::cout << "fd: " << fd << std::endl;
 		// 1. append to the corresponding fd buffers.
 		// 2. parse to HTTP request -> if complete,
 									// run the request and get response; return true
