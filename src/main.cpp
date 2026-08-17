@@ -11,6 +11,29 @@
 // for poll
 #include <poll.h>
 
+// for close
+#include <unistd.h>
+
+void	markForClose(int fd, std::vector<struct pollfd>& pollfds)
+{
+	close(fd);
+	for (size_t i =0; i < pollfds.size(); i++)
+	{
+		if (pollfds[i].fd == fd)
+		{
+			pollfds.erase(pollfds.begin() + i); // no other way???
+			break;
+		}
+	}
+	std::cout << "Mark this fd is finished and ready to close. " << fd << std::endl;
+	std::cout << "We need a stucture to record fd and buffers" << std::endl;
+	std::cout << "----remain-----" << std::endl;
+	for (size_t i = 0; i < pollfds.size(); i++)
+	{
+		std::cout << "fd: " << pollfds[i].fd << std::endl; 
+	}
+}
+
 void	accpetNewClient(Server& server, std::vector<struct pollfd>& pollfds)
 {
 	//struct sockaddr_in clientAddr;
@@ -25,7 +48,7 @@ void	accpetNewClient(Server& server, std::vector<struct pollfd>& pollfds)
 
 	struct pollfd client;
 	client.fd = clientFd;
-	client.events = POLLIN | POLLOUT;
+	client.events = POLLIN;
 	client.revents = 0;
 	pollfds.push_back(client);
 
@@ -33,7 +56,7 @@ void	accpetNewClient(Server& server, std::vector<struct pollfd>& pollfds)
 	std::cout << "A new client connected." << std::endl;
 }
 
-void	receiveClientData(int fd)
+bool	receiveClientData(int fd, std::vector<struct pollfd>& pollfds)
 {
 	char buffer[1024] = {0};
 
@@ -43,33 +66,37 @@ void	receiveClientData(int fd)
 	{
 		std::cout << "Receiving from client: " << buffer << std::endl;
 		// 1. append to the corresponding fd buffers.
-		// 2. parse to HTTP request -> if complete, run the request and get response;
+		// 2. parse to HTTP request -> if complete,
+									// run the request and get response; return true
+									// else return false;
+		return false;
 	}
 	else if (bytesReceived == 0)
 	{
 		std::cout << "Client has disconnected before sending all the data";
-		// markForClose(fd);
+		markForClose(fd, pollfds);
 	}
 	else
 	{
 		std::cerr << "Socket error during recv." << std::endl;
 		if (errno != EAGAIN && errno != EWOULDBLOCK)
 		{
-			// markeForClose(fd);
+			markForClose(fd, pollfds);
 		}
-	}	
+	}
+	return false;
 }
 
-void	sendClientData(int fd)
+bool	sendClientData(int fd)
 {
 	std::cout << "the client request has been processed. The response is ready and translate TCP. " 
 			  << "\n here we prepare for sending the data back. fd is " << fd << std::endl;
-}
 
-void	markForClose(int fd)
-{
-	std::cout << "Mark this fd is finished and ready to close. " << fd << std::endl;
-	std::cout << "We need a stucture to record fd and buffers" << std::endl;
+	// also need to remove from pollfds and another things. 
+	if (fd < 0) // if finish sending the data, then return true.
+		return true;
+	else
+		return false;
 }
 
 int main(int argc, char **argv)
@@ -111,13 +138,15 @@ int main(int argc, char **argv)
 	{
 		server.start();
 		std::vector<struct pollfd> pollfds;
-		pollfds[0].fd = server.getSocketFd();
-		pollfds[0].events = POLLIN;
-		pollfds[0].revents = 0;
+		struct pollfd socket;
+		socket.fd = server.getSocketFd();
+		socket.events = POLLIN;
+		socket.revents = 0;
+		pollfds.push_back(socket);
 		// while server is running.
 		while (server.getRunning())
 		{
-			int res = poll(&pollfds[0], pollfds.size(), 1000); //timeout?
+			int res = poll(&pollfds[0], pollfds.size(), -1); //timeout?
 
  			if (res == 0)
 			{
@@ -149,26 +178,32 @@ int main(int argc, char **argv)
 
 				if (fd == server.getSocketFd())
 				{
-					if (revents == POLLIN)
+					if (revents & POLLIN)
 					{
 						accpetNewClient(server, pollfds);
 					}
 				}
 				else
 				{
-					if (revents == POLLIN)
+					if (revents & POLLIN)
 					{
-						receiveClientData(fd);
+						if (receiveClientData(fd, pollfds))
+						{
+							pollfds[i].events |= POLLOUT;
+						}
 					}
 
-					if (revents == POLLOUT)
+					if (revents & POLLOUT)
 					{
-						sendClientData(fd);
+						if (sendClientData(fd))
+						{
+							pollfds[i].events &= ~POLLOUT;
+						}
 					}
 					
-					if (revents == POLLERR || revents == POLLNVAL)
+					if (revents & (POLLERR | POLLNVAL))
 					{
-						markForClose(fd);
+						markForClose(fd, pollfds);
 					}
 				}
 				//removeCloseClient();
