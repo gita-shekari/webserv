@@ -13,7 +13,8 @@ Server::Server(void)
 
 Server::~Server(void)
 {
-	close(this->_socketFd);
+	if (this->_socketFd != -1)
+		close(this->_socketFd);
 	std::cout << "Server is down now" << std::endl;
 }
 
@@ -38,6 +39,15 @@ void Server::start(void)
 		std::cerr << "Server failed at set up socket." << std::endl;
 		throw ServerException();
 	}
+
+	// allow immediate restart after server shutdown.
+	#ifdef __APPLE__
+	int no_sigpipe = 1;
+	setsockopt(this->_socketFd, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
+	#endif
+
+	int opt = 1;
+	setsockopt(this->_socketFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
 	// maybe config file contents goes here?
 	sockaddr_in serverAddress;

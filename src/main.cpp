@@ -4,6 +4,8 @@
 #include "Config.hpp"
 #include "Server.hpp"
 
+// for vector
+#include <vector>
 // for socket;
 #include <netinet/in.h> 
 #include <sys/socket.h>
