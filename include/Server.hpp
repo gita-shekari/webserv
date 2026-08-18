@@ -4,7 +4,11 @@
 #include "Client.hpp"
 #include <map>
 #include <sys/socket.h>
+#include <cstring>
 #include <stdexcept>
+#include <netinet/in.h>
+#include <string>
+#include <unistd.h>
 
 class Server
 {
@@ -12,6 +16,10 @@ class Server
 		int _port;
 		int	_serverFd;
 		std::map<int, Client> _clients;
+		void createSocket();
+		void bindSocket();
+		void listenSocket();
+		void acceptClient();
 	public:
 		Server(int _port);
 		~Server();
