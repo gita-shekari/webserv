@@ -33,7 +33,7 @@ class Server
 		void	runningLoop(void);
 
 		// methods for loop
-		void	accpetNewClient(void);
+		void	acceptNewClient(void);
 		bool	receiveClientData(int fd);
 		void	markForClose(int fd);
 		bool	sendClientData(int fd);

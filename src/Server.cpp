@@ -48,7 +48,7 @@ void	Server::markForClose(int fd)
 	}
 }
 
-void	Server::accpetNewClient(void)
+void	Server::acceptNewClient(void)
 {
 	//struct sockaddr_in clientAddr;
 	//socklen_t len = sizeof(clientAddr);
@@ -155,7 +155,7 @@ void	Server::runningLoop(void)
 			{
 				if (revents & POLLIN)
 				{
-					accpetNewClient();
+					acceptNewClient();
 				}
 			}
 			else
