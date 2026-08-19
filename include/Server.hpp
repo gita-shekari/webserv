@@ -13,8 +13,11 @@
 // for poll
 #include <poll.h>
 
-// for vector
+// for containers
 #include <vector>
+#include <map>
+
+#include "Client.hpp"
 
 class Server
 {
@@ -47,6 +50,7 @@ class Server
 		int							_socketFd;
 		bool						_isRunning;
 		std::vector<struct pollfd>	_pollfds;
+		std::map<int, Client>		_clients;
 		// map container of fd and client connection
 		
 

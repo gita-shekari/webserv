@@ -30,21 +30,14 @@ int	Server::getSocketFd(void)
 
 void	Server::markForClose(int fd)
 {
-	close(fd);
-	for (size_t i =0; i < _pollfds.size(); i++)
+	std::cout << "Mark this fd of Client to false, ready to close. " << fd << std::endl;
+	// shouldn't do this because it might create a client if it doent exist;
+	//_clients[fd].Client::disConnected();
+
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if (it != _clients.end())
 	{
-		if (_pollfds[i].fd == fd)
-		{
-			_pollfds.erase(_pollfds.begin() + i); // no other way???
-			break;
-		}
-	}
-	std::cout << "Mark this fd is finished and ready to close. " << fd << std::endl;
-	std::cout << "We need a stucture to record fd and buffers" << std::endl;
-	std::cout << "----remain-----" << std::endl;
-	for (size_t i = 0; i < _pollfds.size(); i++)
-	{
-		std::cout << "fd: " << _pollfds[i].fd << std::endl; 
+		it->second.disConnected();
 	}
 }
 
@@ -69,6 +62,8 @@ void	Server::acceptNewClient(void)
 
 	// create instance of client/connection class.
 
+	_clients.insert(std::make_pair(clientFd, Client(clientFd)));
+
 	//something related to connections
 	std::cout << "A new client connected." << std::endl;
 }
@@ -83,7 +78,12 @@ bool	Server::receiveClientData(int fd)
 	{
 		std::cout << "Receiving from client: " << buffer << std::endl;
 		std::cout << "fd: " << fd << std::endl;
+
 		// 1. append to the corresponding fd buffers.
+		std::map<int, Client>::iterator it = _clients.find(fd);
+		if (it != _clients.end())
+			it->second.appendReadBuffer(buffer);
+
 		// 2. parse to HTTP request -> if complete,
 									// run the request and get response; return true
 									// else return false;
