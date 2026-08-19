@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <string>
 #include <unistd.h>
+#include <iostream>
 
 struct Connection
 {
@@ -20,7 +21,7 @@ class Server
 	private:
 		int _port;
 		int	_serverFd;
-		std::map<int, Connection> _connections;
+		std::map<int, Client> _connections;
 		void createSocket();
 		void bindSocket();
 		void listenSocket();

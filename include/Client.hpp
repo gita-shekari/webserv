@@ -1,25 +1,17 @@
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
+#pragma once
 
-#include <iostream>
-#include <sys/socket.h>
-#include <cstring>
-#include <stdexcept>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <string>
-#include <unistd.h>
+# include "Request.hpp"
+# include "RequestParser.hpp"
+
+# include <string>
 
 class Client
 {
 	private:
-		int			_fd;
-	public:
-		Client();
-		~Client();
-		int getFd() const;
+		int				_fd;
+		std::string		_readBuffer;
+		std::string		_writeBuffer;
+
+		Request			_request; //current request
+		RequestParser	_parser;
 };
-
-#endif
-
-
