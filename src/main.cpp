@@ -137,86 +137,9 @@ int main(int argc, char **argv)
 	// Set up server
 
 	Server server;
-	try
-	{
-		server.start();
-		std::vector<struct pollfd> pollfds;
-		struct pollfd socket;
-		socket.fd = server.getSocketFd();
-		socket.events = POLLIN;
-		socket.revents = 0;
-		pollfds.push_back(socket);
-		// while server is running.
-		while (server.getRunning())
-		{
-			int res = poll(&pollfds[0], pollfds.size(), -1); //timeout?
 
- 			if (res == 0)
-			{
-				// timeout, no event happend;
-				continue;
-			}
-			else if (res < 0)
-			{
-				if (errno == EINTR)
-				{
-					// signal is interupted. start over 
-					continue;
-				}
-				break;
-					// other errors;
-			}
+	if (server.start() == 1)
+		return 1;
 
-			for (size_t i = 0; i < pollfds.size(); i++)
-			{
-				short revents = pollfds[i].revents;
-				
-				if (revents == 0)
-				{
-					//checkTimeouts();
-					continue;
-				}
-					
-				int fd = pollfds[i].fd;
-
-				if (fd == server.getSocketFd())
-				{
-					if (revents & POLLIN)
-					{
-						accpetNewClient(server, pollfds);
-					}
-				}
-				else
-				{
-					if (revents & POLLIN)
-					{
-						if (receiveClientData(fd, pollfds))
-						{
-							pollfds[i].events |= POLLOUT;
-						}
-					}
-
-					if (revents & POLLOUT)
-					{
-						if (sendClientData(fd))
-						{
-							pollfds[i].events &= ~POLLOUT;
-						}
-					}
-					
-					if (revents & (POLLERR | POLLNVAL))
-					{
-						markForClose(fd, pollfds);
-					}
-				}
-				//removeCloseClient();
-				//checkTimeouts();
-			}
-		}
-	}
-	catch(const std::exception& e)
-	{
-		std::cerr << e.what() << '\n';
-	}
 	return 0;
 }
