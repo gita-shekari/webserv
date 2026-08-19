@@ -10,16 +10,23 @@
 #include <string>
 #include <unistd.h>
 
+struct Connection
+{
+	std::string inputBuffer;
+	std::string outputBuffer;
+};
 class Server
 {
 	private:
 		int _port;
 		int	_serverFd;
-		std::map<int, Client> _clients;
+		std::map<int, Connection> _connections;
 		void createSocket();
 		void bindSocket();
 		void listenSocket();
-		void acceptClient();
+		int acceptClient();
+		void receiveRequest(int clientFd);
+		void sendResponse(int clientFd);
 	public:
 		Server(int _port);
 		~Server();

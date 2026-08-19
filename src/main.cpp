@@ -6,5 +6,6 @@ int main(int argc, char **argv)
 	(void)argv;
 	Server server(8080);
 	server.start();
+	
 	return 0;
 }

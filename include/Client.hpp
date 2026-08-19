@@ -2,19 +2,24 @@
 #define CLIENT_HPP
 
 #include <iostream>
+#include <sys/socket.h>
+#include <cstring>
+#include <stdexcept>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string>
+#include <unistd.h>
 
 class Client
 {
 	private:
-		int _fd;
-		std::string _inputBuffer;
-		std::string _outputBuffer;
-
+		int			_fd;
 	public:
-		Client(int fd);
+		Client();
 		~Client();
-
 		int getFd() const;
 };
 
 #endif
+
+

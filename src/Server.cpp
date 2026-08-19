@@ -40,10 +40,40 @@ void Server::listenSocket()
 	if(listen(_serverFd, 10) == -1)
 		throw std::runtime_error("failed to listen");
 }
-void Server::acceptClient()
+int Server::acceptClient()
 {
+	int clientFd = accept(_serverFd, NULL, NULL);
+	if (clientFd == -1)
+		throw std::runtime_error("failed to accept client");
+	return clientFd;
+}
+void Server::receiveRequest(int clientFd)
+{
+	char buffer[4096];
 
-	
+	ssize_t bytesRead = recv(clientFd, buffer, sizeof(buffer) - 1, 0);
+
+	if (bytesRead <= 0)
+		return;
+
+	buffer[bytesRead] = '\0';
+
+	std::cout << "Request received:\n"
+			  << buffer << std::endl;
+}
+void Server::sendResponse(int clientFd)
+{
+	std::string body = "Hello";
+
+	std::string response =
+		"HTTP/1.1 200 OK\r\n"
+		"Content-Type: text/plain\r\n"
+		"Content-Length: 5\r\n"
+		"Connection: close\r\n"
+		"\r\n"
+		"Hello";
+
+	send(clientFd, response.c_str(), response.size(), 0);
 }
 /**
  * @brief starting server by calling two functions to create a socket and bind it
@@ -53,8 +83,11 @@ void Server::start()
 	createSocket();
 	bindSocket();
 	listenSocket();
-	acceptClient();
-
+	std::cout << "Waiting for client..." << std::endl;
+	int clientFd = acceptClient();
+	receiveRequest(clientFd);
+	sendResponse(clientFd);
+	close(clientFd);
 }
 
 // void Server::addClient(int fd, Client client)
