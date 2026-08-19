@@ -15,6 +15,8 @@ class Client
 		bool	getIsConnected(void);
 		void	disConnected(void);
 
+		void	setFd(void);
+
 		// for appending information in buffer
 		void	appendReadBuffer(char *buffer);
 

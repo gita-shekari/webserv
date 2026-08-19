@@ -22,6 +22,11 @@ void	Client::disConnected(void)
 	_isConnected = false;
 }
 
+void	Client::setFd(void)
+{
+	_fd = -1;
+}
+
 void	Client::appendReadBuffer(char *buffer)
 {
 	// any error might happend?

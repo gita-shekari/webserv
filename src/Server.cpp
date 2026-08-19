@@ -38,6 +38,11 @@ void	Server::markForClose(int fd)
 	if (it != _clients.end())
 	{
 		it->second.disConnected();
+		if (fd != -1)
+		{
+			close(fd);
+			it->second.setFd();
+		}	 
 	}
 }
 
@@ -62,6 +67,7 @@ void	Server::acceptNewClient(void)
 
 	// create instance of client/connection class.
 
+	// now it would print client is destroyed three times; probably leftoever from previous process which is being interupt
 	_clients.insert(std::make_pair(clientFd, Client(clientFd)));
 
 	//something related to connections
@@ -160,6 +166,7 @@ void	Server::runningLoop(void)
 			}
 			else
 			{
+
 				if (revents & POLLIN)
 				{
 					if (receiveClientData(fd))
@@ -178,10 +185,12 @@ void	Server::runningLoop(void)
 				
 				if (revents & (POLLERR | POLLNVAL))
 				{
+					std::cout << "in revents pollerr";
 					markForClose(fd);
 				}
 			}
-			//removeCloseClient();
+			// need to remove closed fds from pollFds, also check how the macro works with revents.
+			// removeCloseClient();
 			//checkTimeouts();
 		}
 	}
