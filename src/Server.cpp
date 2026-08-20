@@ -3,6 +3,8 @@
 #include <netinet/in.h> 
 #include <sys/socket.h>
 #include <unistd.h> // for closing socket
+#include <vector>
+#include <algorithm>
 
 Server::Server(void)
 	: _socketFd(-1), 
@@ -62,10 +64,9 @@ void	Server::acceptNewClient(void)
 
 	// create instance of client/connection class.
 
-	// now it would print client is destroyed three times; probably leftoever from previous process which is being interupt
-	_clients.insert(std::make_pair(clientFd, Client(clientFd)));
+	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line. 
+	_clients[clientFd] = Client(clientFd);
 
-	//something related to connections
 	std::cout << "A new client connected." << std::endl;
 }
 
@@ -126,7 +127,7 @@ void	Server::removeCloseClient(void)
 		if (!it->second.getIsConnected())
 		{
 			int closeFd = it->second.getFd();
-			std::vector<struct pullfd>::iterator pfdIt = _pollfds.begin();
+			std::vector<struct pollfd>::iterator pfdIt = _pollfds.begin();
 			while (pfdIt != _pollfds.end())
 			{
 				if (pfdIt->fd == closeFd)
@@ -139,31 +140,14 @@ void	Server::removeCloseClient(void)
 					++pfdIt;
 				}
 			}
-
-			// remove client
+			it = _clients.erase(it);
+			close(closeFd);
 		}
 		else
 		{
 			++it;
 		}
 	}
-	//for (auto it = _clients.begin(); it != _clients.end(); it++)
-	//{
-	//	if (!it->second.getIsConnected())
-	//	{
-	//		int closeFd = it->second.getFd();
-	//		// and delete the client.
-
-	//		for (const auto& pfd : _pollfds)
-	//		{
-	//			if (pfd.fd == closeFd)
-	//			{
-	//				pfd = _pollfds.erase(pfd);
-	//				break;
-	//			}
-	//		}
-	//	}
-	//}
 }
 
 void	Server::runningLoop(void)
@@ -215,6 +199,7 @@ void	Server::runningLoop(void)
 					if (receiveClientData(fd))
 					{
 						_pollfds[i].events |= POLLOUT;
+						// runScript() or CGI;
 					}
 				}
 
@@ -232,10 +217,12 @@ void	Server::runningLoop(void)
 					markForClose(fd);
 				}
 			}
-			// need to remove closed fds from pollFds, also check how the macro works with revents.
-			// removeCloseClient();
+			
+			
 			//checkTimeouts();
 		}
+		// need to remove closed fds from pollFds, also check how the macro works with revents.
+		removeCloseClient();
 	}
 }
 
@@ -310,7 +297,7 @@ int Server::start(void)
 	return 0;
 }
 
-const char* Server::ServerException::what() const throw()
+const char* Server::ServerException::what() const noexcept
 {
 	return "error";
 }

@@ -4,7 +4,7 @@ Client::Client(int fd)
 	: _fd(fd),
 	  _isConnected(true)
 {
-	std::cout << "A client is created" << std::endl;
+	std::cout << "A client is created fd: " << fd << std::endl;
 }
 
 Client::~Client(void)

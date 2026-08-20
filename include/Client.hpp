@@ -9,6 +9,7 @@
 class Client
 {
 	public:
+		Client() = default;
 		Client(int fd);
 		~Client(void);
 
@@ -22,8 +23,8 @@ class Client
 		void	appendReadBuffer(char *buffer);
 
 	private:
-		int				_fd;
-		bool			_isConnected;
+		int				_fd = -1;
+		bool			_isConnected = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
 
