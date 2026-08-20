@@ -38,11 +38,6 @@ void	Server::markForClose(int fd)
 	if (it != _clients.end())
 	{
 		it->second.disConnected();
-		if (fd != -1)
-		{
-			close(fd);
-			it->second.setFd();
-		}	 
 	}
 }
 
@@ -93,7 +88,7 @@ bool	Server::receiveClientData(int fd)
 		// 2. parse to HTTP request -> if complete,
 									// run the request and get response; return true
 									// else return false;
-		return false;
+		return true;
 	}
 	else if (bytesReceived == 0)
 	{
@@ -118,9 +113,57 @@ bool	Server::sendClientData(int fd)
 
 	// also need to remove from pollfds and another things. 
 	if (fd < 0) // if finish sending the data, then return true.
-		return true;
-	else
 		return false;
+	else
+		return true;
+}
+
+void	Server::removeCloseClient(void)
+{
+	std::map<int, Client>::iterator it = _clients.begin();
+	while (it != _clients.end())
+	{
+		if (!it->second.getIsConnected())
+		{
+			int closeFd = it->second.getFd();
+			std::vector<struct pullfd>::iterator pfdIt = _pollfds.begin();
+			while (pfdIt != _pollfds.end())
+			{
+				if (pfdIt->fd == closeFd)
+				{
+					pfdIt = _pollfds.erase(pfdIt);
+					break;
+				}
+				else
+				{
+					++pfdIt;
+				}
+			}
+
+			// remove client
+		}
+		else
+		{
+			++it;
+		}
+	}
+	//for (auto it = _clients.begin(); it != _clients.end(); it++)
+	//{
+	//	if (!it->second.getIsConnected())
+	//	{
+	//		int closeFd = it->second.getFd();
+	//		// and delete the client.
+
+	//		for (const auto& pfd : _pollfds)
+	//		{
+	//			if (pfd.fd == closeFd)
+	//			{
+	//				pfd = _pollfds.erase(pfd);
+	//				break;
+	//			}
+	//		}
+	//	}
+	//}
 }
 
 void	Server::runningLoop(void)

@@ -12,6 +12,11 @@ Client::~Client(void)
 	std::cout << "fd " << _fd << " is destroyed" << std::endl;
 }
 
+int		Client::getFd(void)
+{
+	return _fd;
+}
+
 bool	Client::getIsConnected(void)
 {
 	return _isConnected;

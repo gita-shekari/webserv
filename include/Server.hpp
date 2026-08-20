@@ -40,6 +40,7 @@ class Server
 		bool	receiveClientData(int fd);
 		void	markForClose(int fd);
 		bool	sendClientData(int fd);
+		void	removeCloseClient();
 
 		class ServerException : public std::exception
 		{
