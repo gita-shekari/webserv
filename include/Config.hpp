@@ -1,8 +1,5 @@
-#ifndef CONFIG_HPP
-#define CONFIG_HPP
-
+#pragma once
 class Config
 {
 };
 
-#endif

@@ -1,12 +1,10 @@
 NAME = webserv
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++98
+CXXFLAGS = -Wall -Wextra -Werror -std=c++11
 
 SRC = src/main.cpp \
-      src/Server.cpp \
-      src/Config.cpp \
-	  src/Client.cpp
+     src/ResponseBuilder.cpp \
 
 OBJ = $(SRC:.cpp=.o)
 

@@ -9,7 +9,7 @@ Client::~Client()
 {
 }
 
-int Client::getFd() const
-{
-	return _fd;
-}
+// int Client::getFd() const
+// {
+// 	return _fd;
+// }
