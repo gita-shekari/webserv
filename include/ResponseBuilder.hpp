@@ -10,5 +10,6 @@ class ResponseBuilder
 {
 public:
 	Response build(const Request& request);
+	Response buildGetResponse(const Request& request);
 	std::string serialize(const Response& response);
 };

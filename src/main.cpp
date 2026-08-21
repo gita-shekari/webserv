@@ -18,12 +18,12 @@ int main(int argc, char **argv)
 
     ResponseBuilder builder;
 
-    std::cout << builder.serialize(res) << std::endl;
+    // std::cout << builder.serialize(res) << std::endl;
 
     Request req;
 
     req.method = "GET";
-    req.path = "/";
+    req.path = "/missing";
     req.version = "HTTP/1.1";
     Response resp = builder.build(req);
     std::cout << builder.serialize(resp) << std::endl;

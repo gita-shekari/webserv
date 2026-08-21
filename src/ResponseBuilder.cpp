@@ -48,12 +48,50 @@ std::string ResponseBuilder::serialize(const Response& response)
 // Request.body
 //     ↓
 // important especially for POST
-Response build(const Request& request)
+Response ResponseBuilder::buildGetResponse(const Request& request)
 {
 	Response response;
-	if(request.method == "GET" && request.path == "\"")
+	response.version = "HTTP/1.1";
+	if(request.path == "/")
 	{
+		response.statusCode = 200;
+		response.reasonPhrase = "OK";
+		response.body = "Hello";
+		response.headers["Content-Type"] = "text/plain";
+		response.headers["Content-Length"] = std::to_string(response.body.size());
+	}
+	else
+	{
+		response.statusCode = 404;
+		response.reasonPhrase = "Not Found";
+		response.body = "Not Found";
+		response.headers["Content-Type"] = "text/plain";
+		response.headers["Content-Length"] = std::to_string(response.body.size());
+	}
+	return response;
+}
+Response ResponseBuilder::build(const Request& request)
+{
+	Response response;
+	if(request.method == "GET")
+	{
+		response = buildGetResponse(request);
+	}
+	// else if(request.method == "POST")
+	// {
 
+	// }
+	// else if(request.method == "DELETE")
+	// {
+
+	// }
+	else
+	{
+		response.statusCode = 405;
+		response.reasonPhrase = "Method Not Allowed";
+		response.body = "Method Not Allowed";
+		response.headers["Content-Type"] = "text/plain";
+		response.headers["Content-Length"] = std::to_string(response.body.size());
 	}
 	return response;
 }
