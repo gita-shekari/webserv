@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     Request req;
 
     req.method = "GET";
-    req.path = "/missing";
+    req.path = "/";
     req.version = "HTTP/1.1";
     Response resp = builder.build(req);
     std::cout << builder.serialize(resp) << std::endl;

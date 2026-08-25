@@ -2,6 +2,9 @@
 
 # include <string>
 # include <map>
+#include <fstream>
+#include <sstream>
+
 
 struct Response
 {

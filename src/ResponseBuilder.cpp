@@ -48,25 +48,40 @@ std::string ResponseBuilder::serialize(const Response& response)
 // Request.body
 //     ↓
 // important especially for POST
+bool ResponseBuilder::getSource(const std::string& path, std::string& content)
+{
+	std::ifstream src(path.c_str());
+	if(!src.is_open())
+		return false;
+	std::stringstream buffer;
+	buffer << src.rdbuf();
+	content = buffer.str();
+	return true;
+}
+
 Response ResponseBuilder::buildGetResponse(const Request& request)
 {
 	Response response;
 	response.version = "HTTP/1.1";
+	std::string content;
 	if(request.path == "/")
 	{
-		response.statusCode = 200;
-		response.reasonPhrase = "OK";
-		response.body = "Hello";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] = std::to_string(response.body.size());
-	}
-	else
-	{
-		response.statusCode = 404;
-		response.reasonPhrase = "Not Found";
-		response.body = "Not Found";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] = std::to_string(response.body.size());
+		if(getSource("www/index.html", content))
+		{
+			response.statusCode = 200;
+			response.reasonPhrase = "OK";
+			response.body = content;
+			response.headers["Content-Type"] = "text/html";
+			response.headers["Content-Length"] = std::to_string(response.body.size());
+		}
+		else
+		{
+			response.statusCode = 404;
+			response.reasonPhrase = "Not Found";
+			response.body = "Not Found";
+			response.headers["Content-Type"] = "text/plain";
+			response.headers["Content-Length"] = std::to_string(response.body.size());
+		}
 	}
 	return response;
 }
