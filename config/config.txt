@@ -1,0 +1,27 @@
+1. define all the interface --> server listen to
+2. set up default error page
+3. max allowed size for client request bodies. (1mb - 10 mb for general API endpoint)
+	assessing payloads, configuring infrastructure, enforcin safety thresholds across the tech stack
+	1. Categorize application requirements (what is the data type? JSON, media sub, large file like raw datasets, pdf, video 100-500 mb)
+	2. Guard Against Resource Exhaustion (DoS)
+		Denial of Service -> playload is too big it will crash the app 
+		Buffer overflow --> oversize packets in danger parsing library
+		Noisy neighbor --> slow down other users
+	3. Apply Muilti-layered enforcement (from outside edge to inwards)
+		1. NGINX throws HTTP 413 if its too big: client_max_body_size & location /api/v1/upload { client_max_body_size }
+		2. application middleware: e.g. in node.js set up for a buffer space limitation
+	4. Architectural alternative for massive payloads (directly to cloud storage - presigned URL for large one; or a chunked / Muiltipart streaming)
+4. rules and configs for URL/route for a website
+	1. list of accepted HTTP methods for the route
+	2. HTTP redirection
+	3. Directory ( the requested file should be located)
+	4. enable or disable directory listing
+	5. default file to serve when the requested resource is a directory
+	6. uploading files from a client to server is authorized, and storage location is provided
+	7. execution of CGI
+		1. file extention? 
+		2. enviroment variable in webserver-CGI communicaiton
+		3. chunked requests? EOF
+		4. output -- EOF
+		5. directory and relative path 
+		6. support at least one CGI: php, python, 
