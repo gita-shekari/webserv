@@ -32,12 +32,28 @@ void	Client::setFd(void)
 	_fd = -1;
 }
 
-void	Client::appendReadBuffer(char *buffer)
+bool	Client::parseRequest(char *buffer)
 {
 	// any error might happend?
-	if (_isConnected)
-		_readBuffer.append(buffer); // also need to clean up readBuffer later.
+	if (!_isConnected)
+	{
+		std::cout << " in Client::appendReadBuffer: check the connection of client " << _fd << " is offline. so returned." << std::endl;
+		return ;
+	}
+	
+	_readBuffer.append(buffer);
 
-	std::cout << "in client " << _fd << ": " << std::endl;
-	std::cout << "read buffer is: " << _readBuffer << std::endl;
+	ParseStatus status = _parser.parse(_readBuffer, _request);
+	if (status == COMPLETE)
+	{
+		_readBuffer.clear();
+		return true;
+	}
+	if (status == ERROR)
+	{
+		// what should we do? print error?
+		return true;
+	}
+	if (status == INCOMPLETE)
+		return false;
 }

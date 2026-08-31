@@ -1,7 +1,7 @@
 #pragma once
 
 # include "Request.hpp"
-//# include "RequestParser.hpp"
+# include "RequestParser.hpp"
 
 # include <string>
 # include <iostream>
@@ -20,7 +20,7 @@ class Client
 		void	setFd(void);
 
 		// for appending information in buffer
-		void	appendReadBuffer(char *buffer);
+		bool	parseRequest(char *buffer);
 
 	private:
 		int				_fd = -1;
@@ -29,5 +29,5 @@ class Client
 		std::string		_writeBuffer;
 
 		Request			_request; //current request
-		//RequestParser	_parser;
+		RequestParser	_parser;
 };

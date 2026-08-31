@@ -81,15 +81,16 @@ bool	Server::receiveClientData(int fd)
 		std::cout << "Receiving from client: " << buffer << std::endl;
 		std::cout << "fd: " << fd << std::endl;
 
-		// 1. append to the corresponding fd buffers.
 		std::map<int, Client>::iterator it = _clients.find(fd);
 		if (it != _clients.end())
-			it->second.appendReadBuffer(buffer);
-
-		// 2. parse to HTTP request -> if complete,
-									// run the request and get response; return true
-									// else return false;
-		return true;
+		{
+			if (it->second.parseRequest(buffer))
+			{
+				return true;
+			}
+			else
+				return false;
+		}
 	}
 	else if (bytesReceived == 0)
 	{
