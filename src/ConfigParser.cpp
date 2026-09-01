@@ -10,7 +10,10 @@ void ConfigParser::tokenize(std::ifstream& file)
 	while(std::getline(file, line))
 	{
 		std::string token;
-		
+		for(int i = 0; i < line.size(); i++)
+		{
+			if()
+		}
 		std::cout << line << "\n";
 	}
 
