@@ -5,6 +5,7 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++11
 
 SRC = src/main.cpp \
      src/ResponseBuilder.cpp \
+	 src/ConfigParser.cpp
 
 OBJ = $(SRC:.cpp=.o)
 

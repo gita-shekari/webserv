@@ -4,12 +4,15 @@ ConfigParser::ConfigParser()
 {
 
 }
-ConfigParser::~ConfigParser()
-{
-
-}
 void ConfigParser::tokenize(std::ifstream& file)
 {
+	std::string line;
+	while(std::getline(file, line))
+	{
+		std::string token;
+		
+		std::cout << line << "\n";
+	}
 
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)

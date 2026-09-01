@@ -11,15 +11,21 @@ int main(int argc, char **argv)
 		std::cerr << "Usage: ./webserv <config_file>" << std::endl;
 		return 1;
 	}
+	std::string file;
+	if (argc == 2)
+		file = argv[1];
+	else
+		file = "config/default.conf";
 	try
 	{
-		ConfigParser cp;
-		Config configs = cp.parseConfig(argv[1]);
+		ConfigParser parser;
+		std::vector<ServerConfig> configs = parser.parseConfig(file);
+		std::cout << "Config parsed successfully" << std::endl;
 	}
-	catch(const std::exception& e)
+	catch (const std::exception& e)
 	{
-		std::cerr << e.what() << '\n';
+		std::cerr << "Config error: " << e.what() << std::endl;
+		return 1;
 	}
-
 	return 0;
 }

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <iostream>
+#include <vector>
 
 struct LocationConfig
 {
