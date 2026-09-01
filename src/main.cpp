@@ -1,31 +1,25 @@
 
 #include "Response.hpp"
 #include "ResponseBuilder.hpp"
+#include "Config.hpp"
+#include "ConfigParser.hpp"
+#include <exception>
 int main(int argc, char **argv)
 {
-	(void)argc;
-	(void)argv;
-	// Server server(8080);
-	// server.start();
-	Response res;
+	if(argc > 2)
+	{
+		std::cerr << "Usage: ./webserv <config_file>" << std::endl;
+		return 1;
+	}
+	try
+	{
+		ConfigParser cp;
+		Config configs = cp.parseConfig(argv[1]);
+	}
+	catch(const std::exception& e)
+	{
+		std::cerr << e.what() << '\n';
+	}
 
-    res.version = "HTTP/1.1";
-    res.statusCode = 200;
-    res.reasonPhrase = "OK";
-    res.headers["Content-Type"] = "text/plain";
-    res.headers["Content-Length"] = "5";
-    res.body = "Hello";
-
-    ResponseBuilder builder;
-
-    // std::cout << builder.serialize(res) << std::endl;
-
-    Request req;
-
-    req.method = "GET";
-    req.path = "/";
-    req.version = "HTTP/1.1";
-    Response resp = builder.build(req);
-    std::cout << builder.serialize(resp) << std::endl;
 	return 0;
 }
