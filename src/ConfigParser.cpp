@@ -46,6 +46,18 @@ void ConfigParser::tokenize(std::ifstream& file)
 }
 ServerConfig ConfigParser::parseServer()
 {
+	_current++;
+	if(_tokens[_current] != "{")
+	{
+		throw std::runtime_error("the format of config file is not correct!");
+	}
+	while (_tokens[_current] != "}")
+	{
+		if(_tokens[_current] == "listen")
+			
+	}
+
+
 
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
@@ -53,10 +65,15 @@ std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
 	std::ifstream conf(filename.c_str());
 	if (!conf.is_open())
 		throw std::runtime_error("Config file can not be opened");
+	_current = 0;
+	_tokens.clear();
 	tokenize(conf);
 	std::vector<ServerConfig> configs;
-	parseServer();
-
+	while(_current < _tokens.size())
+	{
+		if (_tokens[_current] != "server")
+			throw std::runtime_error("Expected server block");
+		configs.push_back(parseServer());
+	}
 	return configs;
-
 }
