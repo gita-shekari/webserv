@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
-
+#include <cctype>
 class ConfigParser
 {
 	private:

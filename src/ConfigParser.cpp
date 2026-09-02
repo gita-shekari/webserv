@@ -10,12 +10,42 @@ void ConfigParser::tokenize(std::ifstream& file)
 	while(std::getline(file, line))
 	{
 		std::string token;
-		for(int i = 0; i < line.size(); i++)
+		for(size_t i = 0; i < line.size(); i++)
 		{
-			if()
+			if(std::isspace(static_cast<unsigned char>(line[i])))
+			{
+				if (!token.empty())
+				{
+					_tokens.push_back(token);
+					token.clear();
+				}
+			}
+			else if(line[i] == '{' || line[i] == '}' || line[i] == ';')
+			{
+				if (!token.empty())
+				{
+					_tokens.push_back(token);
+					token.clear();
+				}
+				_tokens.push_back(std::string(1, line[i]));
+			}
+			else
+			{
+				token+=line[i];
+			}
 		}
-		std::cout << line << "\n";
+		if (!token.empty())
+		{
+			_tokens.push_back(token);
+		}
 	}
+	for(size_t i = 0; i < _tokens.size(); i++)
+		{
+			std::cout << _tokens[i] << "\n";
+		}
+}
+ServerConfig ConfigParser::parseServer()
+{
 
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
@@ -24,8 +54,9 @@ std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
 	if (!conf.is_open())
 		throw std::runtime_error("Config file can not be opened");
 	tokenize(conf);
-	// parsing comes later
 	std::vector<ServerConfig> configs;
+	parseServer();
+
 	return configs;
 
 }
