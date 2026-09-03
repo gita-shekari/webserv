@@ -21,7 +21,6 @@ int main(int argc, char **argv)
 		ConfigParser parser;
 		std::vector<ServerConfig> configs = parser.parseConfig(file);
 		std::cout << "Config parsed successfully" << std::endl;
-		size_t i = 0;
 
 		//Server server(configs[0]);
 
