@@ -6,9 +6,10 @@
 #include <vector>
 #include <algorithm>
 
-Server::Server(void)
+Server::Server(struct ServerConfig& config)
 	: _socketFd(-1), 
-	  _isRunning(false)
+	  _isRunning(false),
+	  _config(config)
 {
 	std::cout << "Server is up" << std::endl;
 }
@@ -70,7 +71,7 @@ void	Server::acceptNewClient(void)
 	std::cout << "A new client connected." << std::endl;
 }
 
-bool	Server::receiveClientData(int fd)
+ReceiveStatus	Server::receiveClientData(int fd)
 {
 	char buffer[1024] = {0};
 
@@ -84,12 +85,11 @@ bool	Server::receiveClientData(int fd)
 		std::map<int, Client>::iterator it = _clients.find(fd);
 		if (it != _clients.end())
 		{
-			if (it->second.parseRequest(buffer))
-			{
-				return true;
-			}
-			else
-				return false;
+			ReceiveStatus status = it->second.parseRequest(buffer);
+			if (status == COMPLETE)
+				return COMPLETE;
+			else if ()
+				return 	IMCOMPLETE;
 		}
 	}
 	else if (bytesReceived == 0)
@@ -197,11 +197,14 @@ void	Server::runningLoop(void)
 
 				if (revents & POLLIN)
 				{
-					if (receiveClientData(fd))
+					ReceiveStatus status = receiveClientData(fd);
+					if (status == COMPLETE)
 					{
 						_pollfds[i].events |= POLLOUT;
 						// runScript() or CGI;
 					}
+					if (status == IMCOMPLETE)
+						continue;
 				}
 
 				if (revents & POLLOUT)

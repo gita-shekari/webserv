@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
@@ -18,19 +20,13 @@
 #include <map>
 
 #include "Client.hpp"
-
-enum ReceiveStatus
-{
-	COMPLETE,
-	IMCOMPLETE,
-	ERROR,
-	DISCONNECT
-};
+#include "Config.hpp"
 
 class Server
 {
 	public:
-		Server(void);
+
+		Server(struct ServerConfig& config);
 		~Server(void);
 
 		int start();
@@ -44,11 +40,11 @@ class Server
 		void	runningLoop(void);
 
 		// methods for loop
-		void	acceptNewClient(void);
-		bool	receiveClientData(int fd);
-		void	markForClose(int fd);
-		bool	sendClientData(int fd);
-		void	removeCloseClient();
+		void			acceptNewClient(void);
+		ReceiveStatus	receiveClientData(int fd);
+		void			markForClose(int fd);
+		bool			sendClientData(int fd);
+		void			removeCloseClient();
 
 		class ServerException : public std::exception
 		{
@@ -60,9 +56,10 @@ class Server
 		bool						_isRunning;
 		std::vector<struct pollfd>	_pollfds;
 		std::map<int, Client>		_clients;
+		struct ServerConfig& 		_config;
 		// map container of fd and client connection
-		
 
+		Server(void);
 };
 
 #endif

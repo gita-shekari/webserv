@@ -6,6 +6,14 @@
 # include <string>
 # include <iostream>
 
+enum ReceiveStatus
+{
+	COMPLETE,
+	IMCOMPLETE,
+	ERROR,
+	DISCONNECT
+};
+
 class Client
 {
 	public:
@@ -20,7 +28,7 @@ class Client
 		void	setFd(void);
 
 		// for appending information in buffer
-		bool	parseRequest(char *buffer);
+		ReceiveStatus	parseRequest(char *buffer);
 
 	private:
 		int				_fd = -1;
