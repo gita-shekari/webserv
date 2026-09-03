@@ -38,7 +38,7 @@ bool	Client::parseRequest(char *buffer)
 	if (!_isConnected)
 	{
 		std::cout << " in Client::appendReadBuffer: check the connection of client " << _fd << " is offline. so returned." << std::endl;
-		return ;
+		return false;
 	}
 	
 	_readBuffer.append(buffer);
@@ -56,4 +56,5 @@ bool	Client::parseRequest(char *buffer)
 	}
 	if (status == INCOMPLETE)
 		return false;
+	return false;
 }

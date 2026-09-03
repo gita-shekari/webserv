@@ -25,3 +25,12 @@
 		4. output -- EOF
 		5. directory and relative path 
 		6. support at least one CGI: php, python, 
+
+
+
+words space punctuation newline word space punctuation newline 
+special symbols(like delimiters -- EOF \n \t whitespace)
+
+different types of tokenizers
+1. whitespace - punctuation after words
+2. Regex-based

@@ -9,13 +9,34 @@ int main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 
+	if (argc != 2)
+	{
+		std::cout << "provide one configuration file" << std::endl;
+		return 1;
+	}
+
+	try
+	{
+		Config configFile;
+		configFile.tokenization(argv[1]);
+		std::cout << "in config parsing" << std::endl;
+		std::vector<struct Token>& tokens = configFile.getTokens();
+		for (const auto& token : tokens)
+		{
+
+			std::cout << token.type << std::endl;
+			std::cout << token.value << std::endl;
+		}
+	}
+	catch(const std::exception& e)
+	{
+		std::cerr << e.what() << '\n';
+		return 1;
+	}
+	
+
 	//// take config file & handle 
-	//if (argc != 2)
-	//{
-	//	// ERROR 
-	//	std::cout << "too much arguments" << std::endl;
-	//	return 1;
-	//}
+
 	//std::ifstream configFile(argv[1]);
 	//if (!configFile.is_open())
 	//{

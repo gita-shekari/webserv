@@ -19,6 +19,14 @@
 
 #include "Client.hpp"
 
+enum ReceiveStatus
+{
+	COMPLETE,
+	IMCOMPLETE,
+	ERROR,
+	DISCONNECT
+};
+
 class Server
 {
 	public:
