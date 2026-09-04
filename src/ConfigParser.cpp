@@ -61,6 +61,58 @@ bool ConfigParser::isValidPort(const std::string& token)
 LocationConfig ConfigParser::parseLocation()
 {
 	LocationConfig lc;
+	// current token is "location"
+	_current++;
+	if (_current >= _tokens.size())
+		throw std::runtime_error("Missing path after location");
+	lc.path = _tokens[_current];
+	_current++;
+	if (_current >= _tokens.size() || _tokens[_current] != "{")
+		throw std::runtime_error("Expected '{' after location");
+	_current++;
+	while (_current < _tokens.size() && _tokens[_current] != "}")
+	{
+		if (_tokens[_current] == "methods")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Expected method name");
+			while (_current < _tokens.size() && _tokens[_current] != ";")
+			{
+				lc.methods.push_back(_tokens[_current]);
+				_current++;
+			}
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Expected ';' after methods");
+			_current++;
+		}
+		else if (_tokens[_current] == "root")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Expected root path");
+			lc.root = _tokens[_current];
+			_current++;
+			if (_current >= _tokens.size() || _tokens[_current] != ";")
+				throw std::runtime_error("Expected ';' after root");
+			_current++;
+		}
+		else if (_tokens[_current] == "index")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Expected index file");
+			lc.index = _tokens[_current];
+			_current++;
+			if (_current >= _tokens.size() || _tokens[_current] != ";")
+				throw std::runtime_error("Expected ';' after index");
+			_current++;
+		}
+		else
+			throw std::runtime_error("Unknown location directive: " + _tokens[_current]);
+	}
+	if (_current >= _tokens.size())
+		throw std::runtime_error("Missing '}' for location block");
 	_current++;
 	return lc;
 }
@@ -70,7 +122,6 @@ ServerConfig ConfigParser::parseServer()
 	// current token is "server"
 	//opening {
 	_current++;
-	std::cout << _tokens[_current] << '\n';
 	if (_current >= _tokens.size() || _tokens[_current] != "{")
 		throw std::runtime_error("Expected '{' after server");
 	_current++;
@@ -112,10 +163,11 @@ ServerConfig ConfigParser::parseServer()
 		<< "port="
 		<< sc.port
 		<< ", root="
-		<< sc.root
-		<< ", locations="
-		<< sc.locations.size()
-		<< std::endl;
+		<< sc.root;
+		std::cout << ", locations=";
+		for(size_t i = 0; i < sc.locations.size(); i++)
+			std::cout << sc.locations[i].path;
+		std::cout << std::endl;
 	return sc;
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
