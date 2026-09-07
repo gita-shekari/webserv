@@ -52,8 +52,13 @@ void	Server::acceptNewClient(void)
 	int clientFd = accept(_socketFd, NULL, NULL);
 	if (clientFd == -1)
 	{
-		// do we need to do something?
-		std::cerr << "Error at accepting client" << std::endl;
+		// if we set socket as O_NONBLOCK, then no connection is ready can return -1
+		if (errno == EINTR)
+			logError("[WARNING] accept signal interrupt", errno); 
+		else if (errno == EMFILE || errno == ENFILE)
+			logError("[FATAL] accept, running out of file descriptors. ", errno);
+		else if (errno == EBADF || errno == ENOTSOCK)
+			logError("[DEBUG] invalid socketFd at accept.", errno); // for debugging. we won't have this error.
 		return ;
 	}
 
@@ -85,27 +90,36 @@ ReceiveStatus	Server::receiveClientData(int fd)
 		std::map<int, Client>::iterator it = _clients.find(fd);
 		if (it != _clients.end())
 		{
-			ReceiveStatus status = it->second.parseRequest(buffer);
+			ParseStatus status = it->second.parseRequest(buffer);
 			if (status == COMPLETE)
 				return COMPLETE;
-			else if ()
-				return 	IMCOMPLETE;
+			else if (status == INCOMPLETE)
+				return 	CONTINUE;
+			else if (status == ERROR)
+				return ERROR;
 		}
 	}
 	else if (bytesReceived == 0)
 	{
 		std::cout << "Client has disconnected before sending all the data";
 		markForClose(fd);
+		return CONTINUE;
 	}
 	else
 	{
 		std::cerr << "Socket error during recv." << std::endl;
-		if (errno != EAGAIN && errno != EWOULDBLOCK)
+		logError("recv", errno); // info
+		if (errno == ECONNRESET || errno == ETIMEDOUT)
 		{
 			markForClose(fd);
+			std::cerr << "[WARNING] recv connection is broken " << strerror(errno) << std::endl;
 		}
+		else if (errno == EINTR)
+		{
+			std::cerr << "[WARNING] recv is being interrupted " << strerror(errno) << std::endl;
+		}
+		return CONTINUE;
 	}
-	return false;
 }
 
 bool	Server::sendClientData(int fd)
@@ -153,37 +167,66 @@ void	Server::removeCloseClient(void)
 
 void	Server::runningLoop(void)
 {
+	int	eagainCount = 0;
 	while (_isRunning)
 	{
 		int res = poll(&_pollfds[0], _pollfds.size(), -1); //timeout?
 
-		if (res == 0)
-		{
-			// timeout, no event happend;
+		if (res == 0)// timeout, no event happend;
 			continue;
-		}
-		else if (res < 0)
+		else if (res == -1)
 		{
 			if (errno == EINTR)
 			{
-				// signal is interupted. start over 
+				std::cerr << "[WARNING] poll failed due to " << strerror(errno) << std::endl;
 				continue;
 			}
-			break;
-				// other errors;
+			else if (errno == EAGAIN || errno == ENOMEM)
+			{
+				if (eagainCount > 2)
+				{
+					std::cerr << "[FATAL] poll failed due to kernel temporarily out of resources.\n" 
+							  << "Retried three times. Now exit. " << std::endl; 
+					throw ServerException();
+				}
+				else
+				{
+					eagainCount++;
+					std::cerr << "[FATAL] poll failed due to kernel temporarily out of resources.\n" 
+							  << "Try poll() again..." << std::endl;
+					continue;
+				}
+			}
+			else
+			{
+				std::cerr << "[FATAL] poll failed due to " << strerror(errno) 
+							<< " (errno = " << errno << ")" << std::endl; 
+				throw ServerException();				
+			}
 		}
 
 		for (size_t i = 0; i < _pollfds.size(); i++)
 		{
 			short revents = _pollfds[i].revents;
+			int fd = _pollfds[i].fd;
 			
+			// check revent error firstly;
 			if (revents == 0)
 			{
 				//checkTimeouts();
 				continue;
 			}
-				
-			int fd = _pollfds[i].fd;
+			if (revents & POLLNVAL) // fd is closed. our program wont have it. debug
+			{
+				std::cerr << "[DEBUG] POLLENVAL fd is invalid. Logic bug, prevent double close." << std::endl;
+				continue;
+			}
+			if (revents & (POLLERR | POLLHUP))
+			{
+				std::cerr << "[INFO] fd is closed" << std::endl;
+				markForClose(fd);
+				continue;
+			}
 
 			if (fd == _socketFd)
 			{
@@ -194,7 +237,6 @@ void	Server::runningLoop(void)
 			}
 			else
 			{
-
 				if (revents & POLLIN)
 				{
 					ReceiveStatus status = receiveClientData(fd);
@@ -203,10 +245,9 @@ void	Server::runningLoop(void)
 						_pollfds[i].events |= POLLOUT;
 						// runScript() or CGI;
 					}
-					if (status == IMCOMPLETE)
+					if (status == INCOMPLETE)
 						continue;
 				}
-
 				if (revents & POLLOUT)
 				{
 					if (sendClientData(fd))
@@ -214,19 +255,12 @@ void	Server::runningLoop(void)
 						_pollfds[i].events &= ~POLLOUT;
 					}
 				}
-				
-				if (revents & (POLLERR | POLLNVAL))
-				{
-					std::cout << "in revents pollerr";
-					markForClose(fd);
-				}
 			}
-			
-			
 			//checkTimeouts();
 		}
 		// need to remove closed fds from pollFds, also check how the macro works with revents.
 		removeCloseClient();
+		eagainCount = 0;
 	}
 }
 
@@ -247,9 +281,22 @@ void	Server::setsocket(void)
 
 	if (this->_socketFd == -1)
 	{
-		std::cerr << "Server failed at set up socket." << std::endl;
+		std::cerr << "[FATAL] Socket cannot be created due to " << strerror(errno)
+					  << " (errno = " << errno << " )" << std::endl;
+		/** ERROR TYPES -- for now we only log, not diff them 
+		 * ❌ Invalid Arguments (Configuration Errors)
+		 * EAFNOSUPPORT (Linux) / WSAEAFNOSUPPORT (Windows): The specified address family (e.g., AF_INET, AF_INET6) is not supported by the OS implementation or network stack.
+		 * EPROTONOSUPPORT / WSAEPROTONOSUPPORT: The requested network protocol is not supported within this domain (e.g., trying to use an invalid protocol number for a SOCK_STREAM socket).
+		 * EINVAL / WSAEINVAL: General invalid flags or an unknown protocol combination passed into the function parameters. 
+		 * 🛑 Resource Exhaustion (System-Level Limits)
+		 * EMFILE / WSAEMFILE: 
+		 * The process has hit its maximum cap for open file descriptors. Your program has too many open files or sockets and cannot allocate a new one.
+		 * ENFILE: The entire operating system has run out of open file allocations globally.
+		 * ENOBUFS or ENOMEM / WSAENOBUFS: The kernel lacks insufficient memory or buffer space to provision the new socket. 
+		 * 🔒 Permission Constraints
+		 * EACCES / WSAEACCES: The process lacks the required privilege to create a socket of this specific type or protocol. (For example: creating raw sockets SOCK_RAW usually requires root/administrative permissions)
+		*/
 		throw ServerException();
-		return ;
 	}
 
 	// allow immediate restart after server shutdown.
@@ -261,24 +308,46 @@ void	Server::setsocket(void)
 	int opt = 1;
 	setsockopt(this->_socketFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-	// maybe config file contents goes here?
+	//config file contents goes here?
 	sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
+	// port number need to be replaced according to config 
 	serverAddress.sin_port = htons(8080);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(this->_socketFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
 	{
-		std::cerr << "Server failed at binding socket." << std::endl;
+		if (errno == EACCES)
+		{
+			
+			std::cerr << "[FATAL] Permission denied. Ports under 8080 require administrator/root privileges.\n"
+					  << "Try running your command with 'sudo'." << std::endl;
+		}
+		else if (errno == EADDRINUSE)
+		{
+			std::cerr << "[FATAL] Port is already in use by another application.\n"
+                  	  << "Please run 'sudo lsof -i :<port>' to find and terminate the conflicting process.\n";
+		}
+		else
+		{
+			std::cerr << "[FATAL] Socket cannot be binded due to " << strerror(errno)
+					  << " (errno = " << errno << " )" << std::endl;
+		}
+		/** OTHER ERRORs : probably won't get. only log if so.
+		 * ❌ EADDRNOTAVAIL / WSAEADDRNOTAVAIL (Cannot assign requested address)
+		 * The Cause: You tried to bind the socket to a specific IP address that does not physically belong to any network interface on the local machine (e.g., trying to bind to a public web IP instead of your internal LAN IP).
+		 * The Fix: If you want your program to listen on all available network cards, bind using the wildcard address INADDR_ANY (0.0.0.0).
+		 * ⚠️ EBADF / WSAENOTSOCK (Bad descriptor)
+		 * The Cause: The socket file descriptor passed into bind() is completely invalid. This usually happens if your previous socket() initialization failed (returned -1) and you forgot to check it before calling bind().
+		 */
 		throw ServerException();
-		return ;
 	}
 	
 	if (listen(this->_socketFd, 5) == -1)
 	{
-		std::cerr << "Server failed at setting socket listening." << std::endl;
+		std::cerr << "[FATAL] Listen cannot be setup due to " << strerror(errno)
+				  << " (errno = " << errno << " )" << std::endl;
 		throw ServerException();
-		return ;
 	}
 
 	this->_isRunning = true;
@@ -289,7 +358,7 @@ int Server::start(void)
 {
 	try
 	{
-		setsocket();
+		setsocket(); // error happen will throw exception
 		setPollFds();
 		runningLoop();
 	}

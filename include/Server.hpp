@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef SERVER_HPP
-#define SERVER_HPP
-
 #include <string>
 #include <iostream>
 // error macro is here
@@ -62,4 +59,4 @@ class Server
 		Server(void);
 };
 
-#endif
+void logError(const char* func, int errNb);

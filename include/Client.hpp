@@ -9,9 +9,8 @@
 enum ReceiveStatus
 {
 	COMPLETE,
-	IMCOMPLETE,
 	ERROR,
-	DISCONNECT
+	CONTINUE,
 };
 
 class Client
@@ -25,10 +24,10 @@ class Client
 		void	disConnected(void);
 
 		int		getFd(void);
-		void	setFd(void);
+		void	setFd(void); // no need?
 
 		// for appending information in buffer
-		ReceiveStatus	parseRequest(char *buffer);
+		ParseStatus		parseRequest(char *buffer);
 
 	private:
 		int				_fd = -1;
