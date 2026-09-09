@@ -76,7 +76,8 @@ void	Server::acceptNewClient(void)
 	std::cout << "A new client connected." << std::endl;
 }
 
-ReceiveStatus	Server::receiveClientData(int fd)
+template <typename ClientsIt>
+ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 {
 	char buffer[1024] = {0};
 
@@ -87,17 +88,15 @@ ReceiveStatus	Server::receiveClientData(int fd)
 		std::cout << "Receiving from client: " << buffer << std::endl;
 		std::cout << "fd: " << fd << std::endl;
 
-		std::map<int, Client>::iterator it = _clients.find(fd);
-		if (it != _clients.end())
-		{
-			ParseStatus status = it->second.parseRequest(buffer);
-			if (status == COMPLETE)
-				return COMPLETE;
-			else if (status == INCOMPLETE)
-				return 	CONTINUE;
-			else if (status == ERROR)
-				return ERROR;
-		}
+		
+		ParseStatus status = it->second.parseRequest(buffer);
+		if (status == COMPLETE)
+			return COMPLETE;
+		else if (status == INCOMPLETE)
+			return 	CONTINUE;
+		else if (status == ERROR)
+			return ERROR;
+
 	}
 	else if (bytesReceived == 0)
 	{
@@ -239,13 +238,27 @@ void	Server::runningLoop(void)
 			{
 				if (revents & POLLIN)
 				{
-					ReceiveStatus status = receiveClientData(fd);
+					std::map<int, Client>::iterator it = _clients.find(fd);
+					if (it == _clients.end())
+					{
+						std::cerr << "[DEBUG] check pullfd but client does not exit. " << std::endl;
+						_clients[fd] = Client(fd);
+						continue;
+					}
+
+					ReceiveStatus status = receiveClientData(fd, it);
 					if (status == COMPLETE)
 					{
 						_pollfds[i].events |= POLLOUT;
 						// runScript() or CGI;
 					}
-					if (status == INCOMPLETE)
+					if (status == ERROR)
+					{
+						// check errtype and build response
+						// it->second.getReq().errtype ： the enum has a number as status code, can be used directly to response. 
+
+					}
+					if (status == CONTINUE)
 						continue;
 				}
 				if (revents & POLLOUT)

@@ -32,6 +32,11 @@ void	Client::setFd(void)
 	_fd = -1;
 }
 
+Request	Client::getReq(void)
+{
+	return _request;
+}
+
 ParseStatus	Client::parseRequest(char *buffer)
 {
 	_readBuffer.append(buffer);

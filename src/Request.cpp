@@ -10,6 +10,7 @@ void Request::clear()
 	version.clear();
 	headers.clear();
 	body.clear();
+	errtype = REQ_OK;
 }
 
 void	Request::printRequest()

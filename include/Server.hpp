@@ -38,7 +38,8 @@ class Server
 
 		// methods for loop
 		void			acceptNewClient(void);
-		ReceiveStatus	receiveClientData(int fd);
+		template <typename ClientsIt>
+		ReceiveStatus	receiveClientData(int fd, ClientsIt it);
 		void			markForClose(int fd);
 		bool			sendClientData(int fd);
 		void			removeCloseClient();

@@ -22,6 +22,7 @@ class Client
 
 		bool	getIsConnected(void);
 		void	disConnected(void);
+		Request	getReq(void);
 
 		int		getFd(void);
 		void	setFd(void); // no need?
