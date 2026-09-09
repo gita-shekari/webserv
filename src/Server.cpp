@@ -5,20 +5,22 @@
 #include <unistd.h> // for closing socket
 #include <vector>
 #include <algorithm>
+#include <cerrno>
 
 Server::Server(struct ServerConfig& config)
 	: _socketFd(-1), 
 	  _isRunning(false),
 	  _config(config)
 {
-	std::cout << "Server is up" << std::endl;
+	Logger::debug("server object created");
 }
 
 Server::~Server(void)
 {
 	if (this->_socketFd != -1)
 		close(this->_socketFd);
-	std::cout << "Server is down now" << std::endl;
+	// not only close socket, also need to check pullfd and clients in case of throw exception destructor.
+	Logger::info("server stopped");
 }
 
 bool Server::getRunning(void)
@@ -33,7 +35,7 @@ int	Server::getSocketFd(void)
 
 void	Server::markForClose(int fd)
 {
-	std::cout << "Mark this fd of Client to false, ready to close. " << fd << std::endl;
+	Logger::debug("marking client for close: fd=" + std::to_string(fd));
 	// shouldn't do this because it might create a client if it doent exist;
 	//_clients[fd].Client::disConnected();
 
@@ -41,6 +43,12 @@ void	Server::markForClose(int fd)
 	if (it != _clients.end())
 	{
 		it->second.disConnected();
+	}
+	else
+	{
+		Logger::fatal("client registry invariant violated: cannot close unknown fd="
+			+ std::to_string(fd));
+		throw ServerException();
 	}
 }
 
@@ -52,13 +60,21 @@ void	Server::acceptNewClient(void)
 	int clientFd = accept(_socketFd, NULL, NULL);
 	if (clientFd == -1)
 	{
+		const int errorNumber = errno;
 		// if we set socket as O_NONBLOCK, then no connection is ready can return -1
-		if (errno == EINTR)
-			logError("[WARNING] accept signal interrupt", errno); 
-		else if (errno == EMFILE || errno == ENFILE)
-			logError("[FATAL] accept, running out of file descriptors. ", errno);
-		else if (errno == EBADF || errno == ENOTSOCK)
-			logError("[DEBUG] invalid socketFd at accept.", errno); // for debugging. we won't have this error.
+		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+			return;
+		if (errorNumber == EINTR)
+			Logger::debug("accept interrupted; retry on the next event");
+		else if (errorNumber == EMFILE || errorNumber == ENFILE)
+			Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
+		else if (errorNumber == EBADF || errorNumber == ENOTSOCK)
+		{
+			Logger::systemError(Logger::FATAL, "accept: invalid listening socket", errorNumber);
+			throw ServerException();
+		}
+		else
+			Logger::systemError(Logger::WARNING, "accept failed", errorNumber);
 		return ;
 	}
 
@@ -73,7 +89,7 @@ void	Server::acceptNewClient(void)
 	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line. 
 	_clients[clientFd] = Client(clientFd);
 
-	std::cout << "A new client connected." << std::endl;
+	Logger::debug("client connected: fd=" + std::to_string(clientFd));
 }
 
 template <typename ClientsIt>
@@ -85,13 +101,12 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 
 	if (bytesReceived > 0)
 	{
-		std::cout << "Receiving from client: " << buffer << std::endl;
-		std::cout << "fd: " << fd << std::endl;
-
+		Logger::debug("received client data: fd=" + std::to_string(fd)
+			+ " bytes=" + std::to_string(bytesReceived));
 		
 		ParseStatus status = it->second.parseRequest(buffer);
 		if (status == COMPLETE)
-			return COMPLETE;
+			return DONE;
 		else if (status == INCOMPLETE)
 			return 	CONTINUE;
 		else if (status == ERROR)
@@ -100,22 +115,26 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 	}
 	else if (bytesReceived == 0)
 	{
-		std::cout << "Client has disconnected before sending all the data";
+		Logger::debug("client closed connection: fd=" + std::to_string(fd));
 		markForClose(fd);
 		return CONTINUE;
 	}
 	else
 	{
-		std::cerr << "Socket error during recv." << std::endl;
-		logError("recv", errno); // info
-		if (errno == ECONNRESET || errno == ETIMEDOUT)
+		const int errorNumber = errno;
+		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+			return CONTINUE;
+		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
 		{
 			markForClose(fd);
-			std::cerr << "[WARNING] recv connection is broken " << strerror(errno) << std::endl;
+			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
 		}
-		else if (errno == EINTR)
+		else if (errorNumber == EINTR)
+			Logger::debug("recv interrupted; retry on the next event");
+ 		else
 		{
-			std::cerr << "[WARNING] recv is being interrupted " << strerror(errno) << std::endl;
+			Logger::systemError(Logger::ERROR, "recv failed", errorNumber);
+			markForClose(fd);
 		}
 		return CONTINUE;
 	}
@@ -123,8 +142,7 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 
 bool	Server::sendClientData(int fd)
 {
-	std::cout << "the client request has been processed. The response is ready and translate TCP. " 
-			  << "\n here we prepare for sending the data back. fd is " << fd << std::endl;
+	Logger::debug("response ready to send: fd=" + std::to_string(fd));
 
 	// also need to remove from pollfds and another things. 
 	if (fd < 0) // if finish sending the data, then return true.
@@ -175,31 +193,31 @@ void	Server::runningLoop(void)
 			continue;
 		else if (res == -1)
 		{
-			if (errno == EINTR)
+			const int errorNumber = errno;
+			if (errorNumber == EINTR)
 			{
-				std::cerr << "[WARNING] poll failed due to " << strerror(errno) << std::endl;
+				Logger::debug("poll interrupted; retrying");
 				continue;
 			}
-			else if (errno == EAGAIN || errno == ENOMEM)
+			else if (errorNumber == EAGAIN || errorNumber == ENOMEM)
 			{
 				if (eagainCount > 2)
 				{
-					std::cerr << "[FATAL] poll failed due to kernel temporarily out of resources.\n" 
-							  << "Retried three times. Now exit. " << std::endl; 
+					Logger::systemError(Logger::FATAL,
+						"poll: resource exhaustion after retries", errorNumber);
 					throw ServerException();
 				}
 				else
 				{
 					eagainCount++;
-					std::cerr << "[FATAL] poll failed due to kernel temporarily out of resources.\n" 
-							  << "Try poll() again..." << std::endl;
+					Logger::systemError(Logger::WARNING,
+						"poll: temporary resource exhaustion; retrying", errorNumber);
 					continue;
 				}
 			}
 			else
 			{
-				std::cerr << "[FATAL] poll failed due to " << strerror(errno) 
-							<< " (errno = " << errno << ")" << std::endl; 
+				Logger::systemError(Logger::FATAL, "poll failed", errorNumber);
 				throw ServerException();				
 			}
 		}
@@ -215,14 +233,39 @@ void	Server::runningLoop(void)
 				//checkTimeouts();
 				continue;
 			}
-			if (revents & POLLNVAL) // fd is closed. our program wont have it. debug
+			if (revents & POLLNVAL)
 			{
-				std::cerr << "[DEBUG] POLLENVAL fd is invalid. Logic bug, prevent double close." << std::endl;
+				Logger::error("poll returned POLLNVAL: invalid registered fd="
+					+ std::to_string(fd) + " action=close_client");
+				if (fd == _socketFd || _clients.find(fd) == _clients.end())
+				{
+					Logger::fatal("event registry invariant violated: fd has no valid owner");
+					throw ServerException();
+				}
+				markForClose(fd);
 				continue;
 			}
-			if (revents & (POLLERR | POLLHUP))
+			if (revents & POLLERR)
 			{
-				std::cerr << "[INFO] fd is closed" << std::endl;
+				if (fd == _socketFd)
+				{
+					Logger::fatal("listening socket reported POLLERR");
+					throw ServerException();
+				}
+				Logger::warning("client socket reported POLLERR: fd=" + std::to_string(fd)
+					+ " action=close_client");
+				markForClose(fd);
+				continue;
+			}
+			if (revents & POLLHUP)
+			{
+				if (fd == _socketFd)
+				{
+					Logger::fatal("listening socket reported POLLHUP");
+					throw ServerException();
+				}
+				Logger::info("client socket hangup: fd=" + std::to_string(fd)
+					+ " action=close_client");
 				markForClose(fd);
 				continue;
 			}
@@ -241,22 +284,23 @@ void	Server::runningLoop(void)
 					std::map<int, Client>::iterator it = _clients.find(fd);
 					if (it == _clients.end())
 					{
-						std::cerr << "[DEBUG] check pullfd but client does not exit. " << std::endl;
-						_clients[fd] = Client(fd);
-						continue;
+						Logger::fatal("event registry invariant violated: poll fd="
+							+ std::to_string(fd) + " has no Client");
+						throw ServerException();
 					}
 
-					ReceiveStatus status = receiveClientData(fd, it);
-					if (status == COMPLETE)
+					ReceiveStatus	status = receiveClientData(fd, it);
+					if (status == DONE)
 					{
 						_pollfds[i].events |= POLLOUT;
 						// runScript() or CGI;
+						// clear client's Request
 					}
 					if (status == ERROR)
 					{
 						// check errtype and build response
 						// it->second.getReq().errtype ： the enum has a number as status code, can be used directly to response. 
-
+						// clear client's Request
 					}
 					if (status == CONTINUE)
 						continue;
@@ -294,8 +338,8 @@ void	Server::setsocket(void)
 
 	if (this->_socketFd == -1)
 	{
-		std::cerr << "[FATAL] Socket cannot be created due to " << strerror(errno)
-					  << " (errno = " << errno << " )" << std::endl;
+		const int errorNumber = errno;
+		Logger::systemError(Logger::FATAL, "socket creation failed", errorNumber);
 		/** ERROR TYPES -- for now we only log, not diff them 
 		 * ❌ Invalid Arguments (Configuration Errors)
 		 * EAFNOSUPPORT (Linux) / WSAEAFNOSUPPORT (Windows): The specified address family (e.g., AF_INET, AF_INET6) is not supported by the OS implementation or network stack.
@@ -330,21 +374,18 @@ void	Server::setsocket(void)
 
 	if (bind(this->_socketFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
 	{
-		if (errno == EACCES)
+		const int errorNumber = errno;
+		if (errorNumber == EACCES)
 		{
-			
-			std::cerr << "[FATAL] Permission denied. Ports under 8080 require administrator/root privileges.\n"
-					  << "Try running your command with 'sudo'." << std::endl;
+			Logger::systemError(Logger::FATAL, "bind: permission denied", errorNumber);
 		}
-		else if (errno == EADDRINUSE)
+		else if (errorNumber == EADDRINUSE)
 		{
-			std::cerr << "[FATAL] Port is already in use by another application.\n"
-                  	  << "Please run 'sudo lsof -i :<port>' to find and terminate the conflicting process.\n";
+			Logger::systemError(Logger::FATAL, "bind: address already in use", errorNumber);
 		}
 		else
 		{
-			std::cerr << "[FATAL] Socket cannot be binded due to " << strerror(errno)
-					  << " (errno = " << errno << " )" << std::endl;
+			Logger::systemError(Logger::FATAL, "bind failed", errorNumber);
 		}
 		/** OTHER ERRORs : probably won't get. only log if so.
 		 * ❌ EADDRNOTAVAIL / WSAEADDRNOTAVAIL (Cannot assign requested address)
@@ -358,15 +399,16 @@ void	Server::setsocket(void)
 	
 	if (listen(this->_socketFd, 5) == -1)
 	{
-		std::cerr << "[FATAL] Listen cannot be setup due to " << strerror(errno)
-				  << " (errno = " << errno << " )" << std::endl;
+		const int errorNumber = errno;
+		Logger::systemError(Logger::FATAL, "listen failed", errorNumber);
 		throw ServerException();
 	}
 
 	this->_isRunning = true;
-	std::cout << "socket is established" << std::endl;
+	Logger::info("listening socket established");
 }
 
+// do we need to return as int?
 int Server::start(void)
 {
 	try
@@ -377,7 +419,6 @@ int Server::start(void)
 	}
 	catch(const std::exception& e)
 	{
-		std::cerr << e.what() << '\n';
 		return 1;
 	}
 	return 0;

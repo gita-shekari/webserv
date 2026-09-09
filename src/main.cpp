@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include "ConfigParser.hpp"
+#include "Logger.hpp"
 #include "Server.hpp"
 
 int main(int argc, char **argv)
@@ -23,18 +24,20 @@ int main(int argc, char **argv)
 	{
 		ConfigParser parser;
 		std::vector<ServerConfig> configs = parser.parseConfig(file);
-		std::cout << "Config parsed successfully" << std::endl;
-		size_t i = 0;
+		Logger::info("configuration parsed successfully: " + file);
+		if (configs.empty())
+		{
+			Logger::fatal("configuration invariant violated: no server configuration");
+			return 1;
+		}
 
 		Server server(configs[0]);
-
+		//server.start();
 	}
 	catch (const std::exception& e)
 	{
-		std::cerr << "Config error: " << e.what() << std::endl;
+		Logger::fatal(std::string("server startup failed: ") + e.what());
 		return 1;
 	}
 	return 0;
-
-
 }

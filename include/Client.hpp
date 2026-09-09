@@ -6,13 +6,6 @@
 # include <string>
 # include <iostream>
 
-enum ReceiveStatus
-{
-	COMPLETE,
-	ERROR,
-	CONTINUE,
-};
-
 class Client
 {
 	public:

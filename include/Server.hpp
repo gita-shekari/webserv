@@ -18,6 +18,14 @@
 
 #include "Client.hpp"
 #include "Config.hpp"
+#include "Logger.hpp"
+
+enum ReceiveStatus
+{
+	DONE,
+	ERROR,
+	CONTINUE,
+};
 
 class Server
 {
@@ -59,5 +67,3 @@ class Server
 
 		Server(void);
 };
-
-void logError(const char* func, int errNb);
