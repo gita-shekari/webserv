@@ -27,11 +27,6 @@ void	Client::disConnected(void)
 	_isConnected = false;
 }
 
-void	Client::setFd(void)
-{
-	_fd = -1;
-}
-
 Request	Client::getReq(void)
 {
 	return _request;

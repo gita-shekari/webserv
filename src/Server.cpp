@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cerrno>
 
-Server::Server(struct ServerConfig& config)
+Server::Server(const std::vector<ServerConfig>& config)
 	: _socketFd(-1), 
 	  _isRunning(false),
 	  _config(config)
@@ -106,12 +106,11 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 		
 		ParseStatus status = it->second.parseRequest(buffer);
 		if (status == COMPLETE)
-			return DONE;
+			return REV_DONE;
 		else if (status == INCOMPLETE)
 			return 	CONTINUE;
-		else if (status == ERROR)
-			return ERROR;
-
+		else
+			return REV_ERROR;
 	}
 	else if (bytesReceived == 0)
 	{
@@ -126,8 +125,8 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 			return CONTINUE;
 		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
 		{
-			markForClose(fd);
 			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
+			markForClose(fd);
 		}
 		else if (errorNumber == EINTR)
 			Logger::debug("recv interrupted; retry on the next event");
@@ -290,7 +289,7 @@ void	Server::runningLoop(void)
 					}
 
 					ReceiveStatus	status = receiveClientData(fd, it);
-					if (status == DONE)
+					if (status == REV_DONE)
 					{
 						
 						_pollfds[i].events |= POLLOUT;
@@ -300,7 +299,7 @@ void	Server::runningLoop(void)
 						//it->second.getReq().
 						// clear client's Request
 					}
-					if (status == ERROR)
+					if (status == REV_ERROR)
 					{
 						// check errtype and buildErrResponse
 						// it->second.getReq().errtype ： the enum has a number as status code, can be used directly to response. 

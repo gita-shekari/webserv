@@ -22,16 +22,15 @@
 
 enum ReceiveStatus
 {
-	DONE,
-	ERROR,
+	REV_DONE,
+	REV_ERROR,
 	CONTINUE,
 };
 
 class Server
 {
 	public:
-
-		Server(struct ServerConfig& config);
+		Server(const std::vector<ServerConfig>& config);
 		~Server(void);
 
 		int start();
@@ -58,12 +57,11 @@ class Server
 		};
 	
 	private:
-		int							_socketFd;
-		bool						_isRunning;
-		std::vector<struct pollfd>	_pollfds;
-		std::map<int, Client>		_clients;
-		struct ServerConfig& 		_config;
-		// map container of fd and client connection
+		int											_socketFd;
+		bool										_isRunning;
+		std::vector<struct pollfd>					_pollfds;
+		std::map<int, Client>						_clients;
+		const std::vector<struct ServerConfig>& 	_config;
 
 		Server(void);
 };

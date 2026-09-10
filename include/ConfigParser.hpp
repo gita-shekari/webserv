@@ -24,7 +24,8 @@ class ConfigParser
 		ServerConfig				parseServer();
 		LocationConfig				parseLocation();
 		const std::string&			currentToken() const;
+		bool 						isValidPort(const std::string& token);
 	public:
 		ConfigParser();
-		std::vector<ServerConfig>	parseConfig(const std::string& filename);
+		const std::vector<ServerConfig>	parseConfig(const std::string& filename);
 };

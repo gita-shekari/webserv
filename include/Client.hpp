@@ -18,7 +18,6 @@ class Client
 		Request	getReq(void);
 
 		int		getFd(void);
-		void	setFd(void); // no need?
 
 		// for appending information in buffer
 		ParseStatus		parseRequest(char *buffer);

@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include "Config.hpp"
 #include "ConfigParser.hpp"
 #include "Logger.hpp"
 #include "Server.hpp"
@@ -23,7 +24,7 @@ int main(int argc, char **argv)
 	try
 	{
 		ConfigParser parser;
-		std::vector<ServerConfig> configs = parser.parseConfig(file);
+		const std::vector<ServerConfig> configs = parser.parseConfig(file);
 		Logger::info("configuration parsed successfully: " + file);
 		if (configs.empty())
 		{
@@ -31,7 +32,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		Server server(configs[0]);
+		Server server(configs);
 		//server.start();
 	}
 	catch (const std::exception& e)
