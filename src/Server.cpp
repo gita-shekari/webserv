@@ -14,7 +14,7 @@ Server::Server(struct ServerConfig& config)
 {
 	Logger::debug("server object created");
 }
-
+// Need server shutdown function.
 Server::~Server(void)
 {
 	if (this->_socketFd != -1)
@@ -292,13 +292,17 @@ void	Server::runningLoop(void)
 					ReceiveStatus	status = receiveClientData(fd, it);
 					if (status == DONE)
 					{
+						
 						_pollfds[i].events |= POLLOUT;
-						// runScript() or CGI;
+
+						// 1. check if we need to run static things? or CGI 
+						// 2. build repsonse based on the return of step 1. 
+						//it->second.getReq().
 						// clear client's Request
 					}
 					if (status == ERROR)
 					{
-						// check errtype and build response
+						// check errtype and buildErrResponse
 						// it->second.getReq().errtype ： the enum has a number as status code, can be used directly to response. 
 						// clear client's Request
 					}
