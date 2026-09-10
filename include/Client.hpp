@@ -14,12 +14,12 @@ class Client
 		Client(int fd);
 		~Client(void);
 
-		bool	getIsConnected(void);
-		void	disConnected(void);
-		Request	getReq(void);
-
-		int		getFd(void);
-		void	setFd(void); // no need?
+		bool		getIsConnected(void);
+		void		disConnected(void);
+		Request		getReq(void);
+		std::string getWriteBuffer();
+		int			getFd(void);
+		void		setFd(void); // no need?
 
 		// for appending information in buffer
 		ParseStatus		parseRequest(char *buffer);

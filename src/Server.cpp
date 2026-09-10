@@ -140,16 +140,22 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 	}
 	return EERROR;
 }
-
 bool	Server::sendClientData(int fd)
 {
 	Logger::debug("response ready to send: fd=" + std::to_string(fd));
-
-	// also need to remove from pollfds and another things.
-	if (fd < 0) // if finish sending the data, then return true.
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if(it == _clients.end())
 		return false;
-	else
-		return true;
+	// also need to remove from pollfds and another things.
+	// if (fd < 0) // if finish sending the data, then return true.
+	// 	return false;
+	// else
+	// 	return true;
+	const std::string &buffer = it->second.getWriteBuffer();
+	ssize_t bytesSent = send(fd,buffer.c_str(), buffer.size(),0);
+	if (bytesSent < 0)
+		return false;
+	return true;
 }
 
 void	Server::removeCloseClient(void)

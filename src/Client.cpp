@@ -48,7 +48,10 @@ ParseStatus	Client::parseRequest(char *buffer)
 	}
 	return status;
 }
-
+std::string Client::getWriteBuffer()
+{
+	return _writeBuffer;
+}
 void Client::buildResponse(const ServerConfig& serverConfig)
 {
 	_response = _builder.build(_request, serverConfig);

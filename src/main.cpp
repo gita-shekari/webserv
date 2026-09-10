@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 		}
 
 		Server server(configs[0]);
-		//server.start();
+		server.start();
 	}
 	catch (const std::exception& e)
 	{
