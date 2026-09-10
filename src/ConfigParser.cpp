@@ -159,15 +159,15 @@ ServerConfig ConfigParser::parseServer()
 	if (_current >= _tokens.size())
 		throw std::runtime_error("Missing '}' for server block");
 	_current++;
-	std::cout
-		<< "port="
-		<< sc.port
-		<< ", root="
-		<< sc.root;
-		std::cout << ", locations=";
-		for(size_t i = 0; i < sc.locations.size(); i++)
-			std::cout << sc.locations[i].path;
-		std::cout << std::endl;
+	// std::cout
+	// 	<< "port="
+	// 	<< sc.port
+	// 	<< ", root="
+	// 	<< sc.root;
+	// 	std::cout << ", locations=";
+	// 	for(size_t i = 0; i < sc.locations.size(); i++)
+	// 		std::cout << sc.locations[i].path;
+	// 	std::cout << std::endl;
 	return sc;
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)

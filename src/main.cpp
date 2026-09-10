@@ -1,11 +1,15 @@
-
-#include "Response.hpp"
-#include "ResponseBuilder.hpp"
-#include "Config.hpp"
+#include <fstream>
+#include <iostream>
+#include <string>
 #include "ConfigParser.hpp"
-#include <exception>
+#include "Logger.hpp"
+#include "Server.hpp"
+
 int main(int argc, char **argv)
 {
+	(void)argc;
+	(void)argv;
+
 	if(argc > 2)
 	{
 		std::cerr << "Usage: ./webserv <config_file>" << std::endl;
@@ -20,14 +24,19 @@ int main(int argc, char **argv)
 	{
 		ConfigParser parser;
 		std::vector<ServerConfig> configs = parser.parseConfig(file);
-		std::cout << "Config parsed successfully" << std::endl;
+		Logger::info("configuration parsed successfully: " + file);
+		if (configs.empty())
+		{
+			Logger::fatal("configuration invariant violated: no server configuration");
+			return 1;
+		}
 
-		//Server server(configs[0]);
-
+		Server server(configs[0]);
+		//server.start();
 	}
 	catch (const std::exception& e)
 	{
-		std::cerr << "Config error: " << e.what() << std::endl;
+		Logger::fatal(std::string("server startup failed: ") + e.what());
 		return 1;
 	}
 	return 0;
