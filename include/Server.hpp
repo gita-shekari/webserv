@@ -20,13 +20,6 @@
 #include "Config.hpp"
 #include "Logger.hpp"
 
-enum ReceiveStatus
-{
-	DDONE,
-	EERROR,
-	CONTINUE,
-};
-
 class Server
 {
 	public:
@@ -47,7 +40,7 @@ class Server
 		// methods for loop
 		void			acceptNewClient(void);
 		template <typename ClientsIt>
-		ReceiveStatus	receiveClientData(int fd, ClientsIt it);
+		bool			receiveClientData(int fd, ClientsIt it);
 		void			markForClose(int fd);
 		bool			sendClientData(int fd);
 		void			removeCloseClient();
@@ -56,7 +49,7 @@ class Server
 		{
 			const char* what() const noexcept override;
 		};
-
+		
 	private:
 		int							_socketFd;
 		bool						_isRunning;

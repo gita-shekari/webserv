@@ -54,6 +54,11 @@ std::string Client::getWriteBuffer()
 }
 void Client::buildResponse(const ServerConfig& serverConfig)
 {
-	_response = _builder.build(_request, serverConfig);
-	_writeBuffer = _builder.serialize(_response);
+	if(_request.errtype == 0)
+	{
+		_response = _builder.build(_request, serverConfig);
+		_writeBuffer = _builder.serialize(_response);
+	}
+	
 }
+

@@ -93,7 +93,7 @@ void	Server::acceptNewClient(void)
 }
 
 template <typename ClientsIt>
-ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
+bool	Server::receiveClientData(int fd, ClientsIt it)
 {
 	char buffer[1024] = {0};
 
@@ -105,25 +105,21 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 			+ " bytes=" + std::to_string(bytesReceived));
 
 		ParseStatus status = it->second.parseRequest(buffer);
-		if (status == COMPLETE)
-			return DDONE;
-		else if (status == INCOMPLETE)
-			return 	CONTINUE;
-		else if (status == ERROR)
-			return EERROR;
-
+		if (status == INCOMPLETE)
+			return 	false;
+		return true;
 	}
 	else if (bytesReceived == 0)
 	{
 		Logger::debug("client closed connection: fd=" + std::to_string(fd));
 		markForClose(fd);
-		return CONTINUE;
+		return false;
 	}
 	else
 	{
 		const int errorNumber = errno;
 		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
-			return CONTINUE;
+			return false;
 		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
 		{
 			markForClose(fd);
@@ -136,9 +132,9 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 			Logger::systemError(Logger::ERROR, "recv failed", errorNumber);
 			markForClose(fd);
 		}
-		return CONTINUE;
+		return false;
 	}
-	return EERROR;
+	return true;
 }
 bool	Server::sendClientData(int fd)
 {
@@ -295,23 +291,11 @@ void	Server::runningLoop(void)
 							+ std::to_string(fd) + " has no Client");
 						throw ServerException();
 					}
-
-					ReceiveStatus	status = receiveClientData(fd, it);
-					if (status == DDONE)
-					{
-						it->second.buildResponse(_config);
-						_pollfds[i].events |= POLLOUT;
-						// runScript() or CGI;
-						// clear client's Request
-					}
-					if (status == EERROR)
-					{
-						// check errtype and build response
-						// it->second.getReq().errtype ： the enum has a number as status code, can be used directly to response.
-						// clear client's Request
-					}
-					if (status == CONTINUE)
+					if (!receiveClientData(fd, it))
 						continue;
+					it->second.buildResponse(_config);
+					_pollfds[i].events |= POLLOUT;
+					//CGI processing
 				}
 				if (revents & POLLOUT)
 				{

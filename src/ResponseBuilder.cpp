@@ -63,8 +63,8 @@ const LocationConfig* ResponseBuilder::findLocation(const std::string& path, con
 	std::vector<LocationConfig>::const_iterator it;
 	for(it = serverConfig.locations.begin(); it != serverConfig.locations.end(); it++)
 	{
-		std::cout << it->path << std::endl;
-		std::cout << path << std::endl;
+		if(it->path == path)
+			return &(*it);
 	}
 	return NULL;
 }
