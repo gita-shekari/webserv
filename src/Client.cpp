@@ -57,7 +57,7 @@ void Client::prepareResponse(const ServerConfig& serverConfig)
 	//status is not 0
 	if(_request.errtype != REQ_OK)
 	{
-		_response = _builder.buildErrorResponse(_request.errtype);
+		_response = _builder.buildErrorResponse(static_cast<int>(_request.errtype));
 	}
 	else
 		_response = _builder.buildResponse(_request, serverConfig);
@@ -65,11 +65,3 @@ void Client::prepareResponse(const ServerConfig& serverConfig)
 }
 
 
-// enum	RequestErr
-// {
-// 	REQ_OK = 0,
-// 	BAD_REQ = 400,
-// 	PLAYLOAD_TOO_LARGE = 413,
-// 	NOT_IMPLEMENTED = 501,
-// 	HTTP_VERSION_NOT_NSUP = 505
-// };
