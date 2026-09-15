@@ -293,7 +293,7 @@ void	Server::runningLoop(void)
 					}
 					if (!receiveClientData(fd, it))
 						continue;
-					it->second.buildResponse(_config);
+					it->second.prepareResponse(_config);
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
 				}

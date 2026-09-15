@@ -52,13 +52,24 @@ std::string Client::getWriteBuffer()
 {
 	return _writeBuffer;
 }
-void Client::buildResponse(const ServerConfig& serverConfig)
+void Client::prepareResponse(const ServerConfig& serverConfig)
 {
-	if(_request.errtype == 0)
+	//status is not 0
+	if(_request.errtype != REQ_OK)
 	{
-		_response = _builder.build(_request, serverConfig);
-		_writeBuffer = _builder.serialize(_response);
+		_response = _builder.buildErrorResponse(_request.errtype);
 	}
-	
+	else
+		_response = _builder.buildResponse(_request, serverConfig);
+	_writeBuffer = _builder.serialize(_response);
 }
 
+
+// enum	RequestErr
+// {
+// 	REQ_OK = 0,
+// 	BAD_REQ = 400,
+// 	PLAYLOAD_TOO_LARGE = 413,
+// 	NOT_IMPLEMENTED = 501,
+// 	HTTP_VERSION_NOT_NSUP = 505
+// };

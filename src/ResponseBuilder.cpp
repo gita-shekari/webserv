@@ -146,7 +146,7 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 	return response;
 }
 
-Response ResponseBuilder::build(const Request& request, const ServerConfig& serverConfig)
+Response ResponseBuilder::buildResponse(const Request& request, const ServerConfig& serverConfig)
 {
 	Response response;
 	if(request.method == "GET")

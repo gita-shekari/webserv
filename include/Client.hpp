@@ -23,7 +23,7 @@ class Client
 
 		// for appending information in buffer
 		ParseStatus		parseRequest(char *buffer);
-		void buildResponse(const ServerConfig& serverConfig);
+		void 			prepareResponse(const ServerConfig& serverConfig);
 
 	private:
 		int				_fd = -1;
