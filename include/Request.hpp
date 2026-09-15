@@ -3,10 +3,13 @@
 # include <string>
 # include <map>
 
-enum	RequestErr
+// called RequestErr before. change when we merge the code.
+enum	HttpStatus
 {
-	REQ_OK = 0,
+	REQ_OK = 200,
 	BAD_REQ = 400,
+	PAGE_NOT_FOUND = 404,
+	METHONDE_NOT_ALLOWED = 405,
 	PLAYLOAD_TOO_LARGE = 413,
 	NOT_IMPLEMENTED = 501,
 	HTTP_VERSION_NOT_NSUP = 505
@@ -19,7 +22,7 @@ struct Request
 	std::string	path;
 	std::string	query;
 	std::string	version;
-	RequestErr	errtype = REQ_OK;
+	HttpStatus	httpStatus = REQ_OK;
 
 	std::map<std::string, std::string> headers;
 

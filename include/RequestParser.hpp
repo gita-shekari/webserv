@@ -49,7 +49,7 @@ class RequestParser
 		ChunkState		_chunkState;
 		size_t			_chunkSize;
 
-		ParseStatus error(Request& req, RequestErr err);
+		ParseStatus error(Request& req, HttpStatus status);
 		ParseStatus	parseRequestLine(const std::string& buffer, Request& req);
 		ParseStatus	parseHeaders(const std::string& buffer, Request& req);
 		ParseStatus	parseBody(const std::string& buffer, Request& req);
