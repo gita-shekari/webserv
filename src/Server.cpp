@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cerrno>
 
-Server::Server(struct ServerConfig& config)
+Server::Server(const std::vector<ServerConfig>& config)
 	: _socketFd(-1),
 	  _isRunning(false),
 	  _config(config)
@@ -292,7 +292,7 @@ void	Server::runningLoop(void)
 					}
 					if (!receiveClientData(fd, it))
 						continue;
-					it->second.prepareResponse(_config);
+					it->second.prepareResponse(_config[0]);
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
 				}
@@ -360,7 +360,7 @@ void	Server::setsocket(void)
 	sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
 	// port number need to be replaced according to config 
-	serverAddress.sin_port = htons(_config.port);
+	serverAddress.sin_port = htons(_config[0].port);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(this->_socketFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
@@ -396,7 +396,7 @@ void	Server::setsocket(void)
 	}
 
 	this->_isRunning = true;
-	Logger::info("listening socket established, at port: " + std::to_string(_config.port));
+	Logger::info("listening socket established, at port: " + std::to_string(_config[0].port));
 }
 
 // do we need to return as int?

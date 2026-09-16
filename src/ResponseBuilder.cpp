@@ -145,14 +145,17 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 		std::to_string(response.body.size());
 	return response;
 }
-// enum	RequestErr
-// {
-// 	REQ_OK = 0,
-// 	BAD_REQ = 400,
-// 	PLAYLOAD_TOO_LARGE = 413,
-// 	NOT_IMPLEMENTED = 501,
-// 	HTTP_VERSION_NOT_NSUP = 505
-// };
+//enum	HttpStatus
+//{
+//	REQ_OK = 200,
+//	BAD_REQ = 400,
+//	PAGE_NOT_FOUND = 404,
+//	METHONDE_NOT_ALLOWED = 405,
+//	PLAYLOAD_TOO_LARGE = 413,
+// 	INTERNAL_SERVER_ERR = 500,
+//	NOT_IMPLEMENTED = 501,
+//	HTTP_VERSION_NOT_NSUP = 505
+//};
 
 Response ResponseBuilder::buildErrorResponse(int statusCode)
 {
