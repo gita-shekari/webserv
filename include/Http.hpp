@@ -1,7 +1,9 @@
 #pragma once
 
-# include <string>
-# include <map>
+#include <string>
+#include <map>
+#include <fstream>
+#include <sstream>
 
 // called RequestErr before. change when we merge the code.
 enum	HttpStatus
@@ -32,4 +34,14 @@ struct Request
 
 	//debug
 	void	printRequest();
+};
+
+
+struct Response
+{
+	std::string							version;
+	int									statusCode;
+	std::string							reasonPhrase;
+	std::map<std::string, std::string>	headers;
+	std::string							body;
 };

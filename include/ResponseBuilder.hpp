@@ -1,7 +1,6 @@
 #pragma once
 
-#include "Request.hpp"
-#include "Response.hpp"
+#include "Http.hpp"
 #include <string>
 #include <iostream>
 #include <map>
