@@ -201,6 +201,6 @@ Response ResponseBuilder::buildResponse(const Request& request, const ServerConf
 
 	// }
 
-	return (buildErrorResponse(static_cast<int>(request.errtype)));
+	return (buildErrorResponse(static_cast<int>(request.httpStatus)));
 }
 

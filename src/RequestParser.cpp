@@ -75,9 +75,9 @@ void	RequestParser::printAttributes() const
 	std::cout << "--->" << std::endl;
 }
 
-ParseStatus RequestParser::error(Request& req, RequestErr err)
+ParseStatus RequestParser::error(Request& req, HttpStatus err)
 {
-	req.errtype = err;
+	req.httpStatus = err;
 	return ERROR;
 }
 
