@@ -1,4 +1,4 @@
-#include "Request.hpp"
+#include "Http.hpp"
 #include <iostream>
 
 void Request::clear()
@@ -10,6 +10,7 @@ void Request::clear()
 	version.clear();
 	headers.clear();
 	body.clear();
+	httpStatus = REQ_OK;
 }
 
 void	Request::printRequest()

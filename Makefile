@@ -3,8 +3,10 @@ NAME = webserv
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror
 
-SRC = main.cpp RequestParser.cpp Request.cpp
+SRC = $(shell find src -type f -name '*.cpp')
 OBJ = $(SRC:.cpp=.o)
+
+INCLUDE = -Iinclude
 
 all: $(NAME)
 
@@ -12,7 +14,7 @@ $(NAME): $(OBJ)
 	$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
 
 clean:
 	rm -f $(OBJ)
