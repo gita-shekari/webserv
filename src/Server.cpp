@@ -1,20 +1,33 @@
 #include "Server.hpp"
 // for socket;
+<<<<<<< HEAD
 #include <netinet/in.h> 
+=======
+#include <netinet/in.h>
+>>>>>>> gita
 #include <sys/socket.h>
 #include <unistd.h> // for closing socket
 #include <vector>
 #include <algorithm>
 #include <cerrno>
 
+<<<<<<< HEAD
 Server::Server(const std::vector<ServerConfig>& config)
 	: _socketFd(-1), 
+=======
+Server::Server(struct ServerConfig& config)
+	: _socketFd(-1),
+>>>>>>> gita
 	  _isRunning(false),
 	  _config(config)
 {
 	Logger::debug("server object created");
 }
+<<<<<<< HEAD
 // Need server shutdown function.
+=======
+
+>>>>>>> gita
 Server::~Server(void)
 {
 	if (this->_socketFd != -1)
@@ -56,7 +69,11 @@ void	Server::acceptNewClient(void)
 {
 	//struct sockaddr_in clientAddr;
 	//socklen_t len = sizeof(clientAddr);
+<<<<<<< HEAD
 	
+=======
+
+>>>>>>> gita
 	int clientFd = accept(_socketFd, NULL, NULL);
 	if (clientFd == -1)
 	{
@@ -86,14 +103,22 @@ void	Server::acceptNewClient(void)
 
 	// create instance of client/connection class.
 
+<<<<<<< HEAD
 	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line. 
+=======
+	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line.
+>>>>>>> gita
 	_clients[clientFd] = Client(clientFd);
 
 	Logger::debug("client connected: fd=" + std::to_string(clientFd));
 }
 
 template <typename ClientsIt>
+<<<<<<< HEAD
 ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
+=======
+bool	Server::receiveClientData(int fd, ClientsIt it)
+>>>>>>> gita
 {
 	char buffer[1024] = {0};
 
@@ -103,6 +128,7 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 	{
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
+<<<<<<< HEAD
 		
 		ParseStatus status = it->second.parseRequest(buffer);
 		if (status == COMPLETE)
@@ -111,22 +137,41 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 			return 	CONTINUE;
 		else
 			return REV_ERROR;
+=======
+
+		ParseStatus status = it->second.parseRequest(buffer);
+		if (status == INCOMPLETE)
+			return 	false;
+		return true;
+>>>>>>> gita
 	}
 	else if (bytesReceived == 0)
 	{
 		Logger::debug("client closed connection: fd=" + std::to_string(fd));
 		markForClose(fd);
+<<<<<<< HEAD
 		return CONTINUE;
+=======
+		return false;
+>>>>>>> gita
 	}
 	else
 	{
 		const int errorNumber = errno;
 		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+<<<<<<< HEAD
 			return CONTINUE;
 		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
 		{
 			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
 			markForClose(fd);
+=======
+			return false;
+		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
+		{
+			markForClose(fd);
+			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
+>>>>>>> gita
 		}
 		else if (errorNumber == EINTR)
 			Logger::debug("recv interrupted; retry on the next event");
@@ -135,6 +180,7 @@ ReceiveStatus	Server::receiveClientData(int fd, ClientsIt it)
 			Logger::systemError(Logger::ERROR, "recv failed", errorNumber);
 			markForClose(fd);
 		}
+<<<<<<< HEAD
 		return CONTINUE;
 	}
 }
@@ -148,6 +194,28 @@ bool	Server::sendClientData(int fd)
 		return false;
 	else
 		return true;
+=======
+		return false;
+	}
+	return true;
+}
+bool	Server::sendClientData(int fd)
+{
+	Logger::debug("response ready to send: fd=" + std::to_string(fd));
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if(it == _clients.end())
+		return false;
+	// also need to remove from pollfds and another things.
+	// if (fd < 0) // if finish sending the data, then return true.
+	// 	return false;
+	// else
+	// 	return true;
+	const std::string &buffer = it->second.getWriteBuffer();
+	ssize_t bytesSent = send(fd,buffer.c_str(), buffer.size(),0);
+	if (bytesSent < 0)
+		return false;
+	return true;
+>>>>>>> gita
 }
 
 void	Server::removeCloseClient(void)
@@ -217,7 +285,11 @@ void	Server::runningLoop(void)
 			else
 			{
 				Logger::systemError(Logger::FATAL, "poll failed", errorNumber);
+<<<<<<< HEAD
 				throw ServerException();				
+=======
+				throw ServerException();
+>>>>>>> gita
 			}
 		}
 
@@ -225,7 +297,11 @@ void	Server::runningLoop(void)
 		{
 			short revents = _pollfds[i].revents;
 			int fd = _pollfds[i].fd;
+<<<<<<< HEAD
 			
+=======
+
+>>>>>>> gita
 			// check revent error firstly;
 			if (revents == 0)
 			{
@@ -287,6 +363,7 @@ void	Server::runningLoop(void)
 							+ std::to_string(fd) + " has no Client");
 						throw ServerException();
 					}
+<<<<<<< HEAD
 
 					ReceiveStatus	status = receiveClientData(fd, it);
 					if (status == REV_DONE)
@@ -307,6 +384,13 @@ void	Server::runningLoop(void)
 					}
 					if (status == CONTINUE)
 						continue;
+=======
+					if (!receiveClientData(fd, it))
+						continue;
+					it->second.prepareResponse(_config);
+					_pollfds[i].events |= POLLOUT;
+					//CGI processing
+>>>>>>> gita
 				}
 				if (revents & POLLOUT)
 				{

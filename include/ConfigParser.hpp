@@ -14,7 +14,6 @@
 #include <vector>
 #include <fstream>
 #include <cctype>
-
 class ConfigParser
 {
 	private:
@@ -24,8 +23,8 @@ class ConfigParser
 		ServerConfig				parseServer();
 		LocationConfig				parseLocation();
 		const std::string&			currentToken() const;
-		bool 						isValidPort(const std::string& token);
+		bool						isValidPort(const std::string& token);
 	public:
 		ConfigParser();
-		const std::vector<ServerConfig>	parseConfig(const std::string& filename);
+		std::vector<ServerConfig>	parseConfig(const std::string& filename);
 };

@@ -170,7 +170,7 @@ ServerConfig ConfigParser::parseServer()
 	// 	std::cout << std::endl;
 	return sc;
 }
-const std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
+std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
 {
 	std::ifstream conf(filename.c_str());
 	if (!conf.is_open())

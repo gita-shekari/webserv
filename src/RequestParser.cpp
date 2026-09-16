@@ -17,7 +17,7 @@ ParseStatus	RequestParser::parse(const std::string& buffer, Request& req)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
 			status = parseBody(buffer, req);
-		else // how can _section == DONE 				
+		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
 			return status;
@@ -75,9 +75,9 @@ void	RequestParser::printAttributes() const
 	std::cout << "--->" << std::endl;
 }
 
-ParseStatus RequestParser::error(Request& req, HttpStatus status)
+ParseStatus RequestParser::error(Request& req, RequestErr err)
 {
-	req.httpStatus = status;
+	req.errtype = err;
 	return ERROR;
 }
 
@@ -87,7 +87,6 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 
 	if (lineEnd == std::string::npos)
 		return INCOMPLETE;
-	
 	std::string line = buffer.substr(_cursor, lineEnd - _cursor);
 
 	size_t	firstSpace = line.find(' ');
@@ -99,7 +98,6 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 		|| secondSpace == firstSpace + 1
 		|| secondSpace + 1 >= line.size())
 		return error(req, BAD_REQ);
-		
 	req.method = line.substr(0, firstSpace);
 	req.rawTarget = line.substr(firstSpace + 1, secondSpace - firstSpace - 1);
 	req.version = line.substr(secondSpace + 1);
@@ -159,7 +157,7 @@ ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 	host = req.headers.find("host");
 	if (host == req.headers.end() || host->second.empty())
 		return error(req, BAD_REQ);
-	_cursor = headerEnd + 4;	
+	_cursor = headerEnd + 4;
 	return (judgeBody(req));
 }
 
@@ -253,7 +251,6 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				return INCOMPLETE;
 			if (buffer[_cursor + _chunkSize] != '\r' || buffer[_cursor + _chunkSize + 1] != '\n')
 				return error(req, BAD_REQ);
-			
 			// if (req.body.size() > config.maxBodySize || _chunkSize > config.maxBodySize - req.body.size())
 			// 		return error(req, PLAYLOAD_TOO_LARGE)
 			req.body.append(buffer, _cursor, _chunkSize);

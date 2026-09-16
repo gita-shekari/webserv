@@ -43,3 +43,20 @@ ParseStatus	Client::parseRequest(char *buffer)
 	}
 	return status;
 }
+std::string Client::getWriteBuffer()
+{
+	return _writeBuffer;
+}
+void Client::prepareResponse(const ServerConfig& serverConfig)
+{
+	//status is not 0
+	if(_request.errtype != REQ_OK)
+	{
+		_response = _builder.buildErrorResponse(static_cast<int>(_request.errtype));
+	}
+	else
+		_response = _builder.buildResponse(_request, serverConfig);
+	_writeBuffer = _builder.serialize(_response);
+}
+
+

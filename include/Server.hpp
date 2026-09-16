@@ -6,7 +6,7 @@
 #include <fstream>
 
 // for socket;
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 // for poll
@@ -20,17 +20,11 @@
 #include "Config.hpp"
 #include "Logger.hpp"
 
-enum ReceiveStatus
-{
-	REV_DONE,
-	REV_ERROR,
-	CONTINUE,
-};
-
 class Server
 {
 	public:
-		Server(const std::vector<ServerConfig>& config);
+
+		Server(struct ServerConfig& config);
 		~Server(void);
 
 		int start();
@@ -46,7 +40,7 @@ class Server
 		// methods for loop
 		void			acceptNewClient(void);
 		template <typename ClientsIt>
-		ReceiveStatus	receiveClientData(int fd, ClientsIt it);
+		bool			receiveClientData(int fd, ClientsIt it);
 		void			markForClose(int fd);
 		bool			sendClientData(int fd);
 		void			removeCloseClient();
@@ -55,13 +49,14 @@ class Server
 		{
 			const char* what() const noexcept override;
 		};
-	
+		
 	private:
-		int											_socketFd;
-		bool										_isRunning;
-		std::vector<struct pollfd>					_pollfds;
-		std::map<int, Client>						_clients;
-		const std::vector<struct ServerConfig>& 	_config;
+		int							_socketFd;
+		bool						_isRunning;
+		std::vector<struct pollfd>	_pollfds;
+		std::map<int, Client>		_clients;
+		struct ServerConfig& 		_config;
+		// map container of fd and client connection
 
 		Server(void);
 };

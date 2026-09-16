@@ -72,14 +72,12 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 {
 	Response response;
 	response.version = "HTTP/1.1";
-	std::string content;
 
 	const LocationConfig *location = findLocation(request.path, serverConfig);
 	if (location == NULL)
 	{
-		
 		response.statusCode = 404;
-		response.reasonPhrase = "Not Found"; // where to use? enum to string
+		response.reasonPhrase = "Not Found";
 		response.body = "Not Found";
 		response.headers["Content-Type"] = "text/plain";
 		response.headers["Content-Length"] = std::to_string(response.body.size());
@@ -127,7 +125,7 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 	else
 		filePath = root + request.path;
 	// 4. Read file
-	//std::string content;
+	std::string content;
 	if (!getSource(filePath, content))
 	{
 		response.statusCode = 404;
@@ -147,13 +145,52 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 		std::to_string(response.body.size());
 	return response;
 }
+// enum	RequestErr
+// {
+// 	REQ_OK = 0,
+// 	BAD_REQ = 400,
+// 	PLAYLOAD_TOO_LARGE = 413,
+// 	NOT_IMPLEMENTED = 501,
+// 	HTTP_VERSION_NOT_NSUP = 505
+// };
 
-Response ResponseBuilder::build(const Request& request, const ServerConfig& serverConfig)
+Response ResponseBuilder::buildErrorResponse(int statusCode)
 {
 	Response response;
+
+	response.version = "HTTP/1.1";
+	response.statusCode = statusCode;
+
+	if (statusCode == 400)
+		response.reasonPhrase = "Bad Request";
+	else if (statusCode == 404)
+		response.reasonPhrase = "Not Found";
+	else if (statusCode == 405)
+		response.reasonPhrase = "Method Not Allowed";
+	else if (statusCode == 413)
+		response.reasonPhrase = "Payload Too Large";
+	else if (statusCode == 501)
+		response.reasonPhrase = "Not Implemented";
+	else if (statusCode == 505)
+		response.reasonPhrase = "HTTP Version Not Supported";
+	else
+	{
+		response.statusCode = 500;
+		response.reasonPhrase = "Internal Server Error";
+	}
+
+	response.body =
+	response.headers["Content-Type"] = "text/html";
+	response.headers["Content-Length"] =
+		std::to_string(response.body.size());
+	return response;
+}
+Response ResponseBuilder::buildResponse(const Request& request, const ServerConfig& serverConfig)
+{
+
 	if(request.method == "GET")
 	{
-		response = buildGetResponse(request, serverConfig);
+		return (buildGetResponse(request, serverConfig));
 	}
 	// else if(request.method == "POST")
 	// {
@@ -163,27 +200,7 @@ Response ResponseBuilder::build(const Request& request, const ServerConfig& serv
 	// {
 
 	// }
-	else
-	{
-		response.statusCode = 405;
-		response.reasonPhrase = "Method Not Allowed";
-		response.body = "Method Not Allowed";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] = std::to_string(response.body.size());
-	}
-	return response;
+
+	return (buildErrorResponse(static_cast<int>(request.errtype)));
 }
 
-void ResponseBuilder::buildErroResponse(const Request& req, const ServerConfig& serverConfig)
-{
-	Response res;
-
-	// might need to change, because it might be different sites's, the root has more part to .www
-	std::string path = serverConfig.root + "error.html";
-	std::string content;
-	if (getSource(path, content))
-	//req.httpStatus == BAD_REQ
-	
-
-	res.body = content;
-}

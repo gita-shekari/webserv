@@ -62,7 +62,7 @@ class RequestParser
 		//parse size
 		bool	parseDecSize(const std::string& str, size_t& size);
 		bool	parseHexSize(const std::string& str, size_t& size);
-	
+
 		//utils
 		std::string	toLower(const std::string& str);
 		std::string	trim(const std::string& str);
