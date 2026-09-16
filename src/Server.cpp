@@ -360,7 +360,7 @@ void	Server::setsocket(void)
 	sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
 	// port number need to be replaced according to config 
-	serverAddress.sin_port = htons(8080);
+	serverAddress.sin_port = htons(_config.port);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(this->_socketFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
@@ -396,7 +396,7 @@ void	Server::setsocket(void)
 	}
 
 	this->_isRunning = true;
-	Logger::info("listening socket established");
+	Logger::info("listening socket established, at port: " + std::to_string(_config.port));
 }
 
 // do we need to return as int?
