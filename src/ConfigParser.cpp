@@ -1,5 +1,16 @@
 #include "ConfigParser.hpp"
 
+
+// struct ServerConfig
+// {
+// 	int port;
+// 	std::string 				root;
+// 	std::string					index;
+// 	std::string					error_page
+// 	size_t 						clientMaxBodySize;
+// 	std::vector<LocationConfig> locations;
+// };
+
 ConfigParser::ConfigParser()
 {
 
@@ -151,6 +162,28 @@ ServerConfig ConfigParser::parseServer()
 				throw std::runtime_error("Expected ';' after root");
 			_current++;
 		}
+		else if (_tokens[_current] == "client_max_body_size")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Missing Max body size");
+			sc.client_max_body_size = _tokens[_current];
+			_current++;
+			if (_current >= _tokens.size() || _tokens[_current] != ";")
+				throw std::runtime_error("Expected ';' after root");
+			_current++;
+		}
+		else if (_tokens[_current] == "error_page")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Missing error_page");
+			sc.error_page = _tokens[_current];
+			_current++;
+			if (_current >= _tokens.size() || _tokens[_current] != ";")
+				throw std::runtime_error("Expected ';' after root");
+			_current++;
+		}
 		else if (_tokens[_current] == "location")
 			sc.locations.push_back(parseLocation());
 		else
@@ -159,15 +192,19 @@ ServerConfig ConfigParser::parseServer()
 	if (_current >= _tokens.size())
 		throw std::runtime_error("Missing '}' for server block");
 	_current++;
-	// std::cout
-	// 	<< "port="
-	// 	<< sc.port
-	// 	<< ", root="
-	// 	<< sc.root;
-	// 	std::cout << ", locations=";
-	// 	for(size_t i = 0; i < sc.locations.size(); i++)
-	// 		std::cout << sc.locations[i].path;
-	// 	std::cout << std::endl;
+	std::cout
+		<< "port="
+		<< sc.port
+		<< ", root="
+		<< sc.root
+		<< ", max="
+		<< sc.client_max_body_size
+		<< ", error_page="
+		<< sc.error_page;
+		std::cout << ", locations=";
+		for(size_t i = 0; i < sc.locations.size(); i++)
+			std::cout << sc.locations[i].path;
+		std::cout << std::endl;
 	return sc;
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)

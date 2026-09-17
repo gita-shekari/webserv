@@ -27,21 +27,16 @@ void	Client::disConnected(void)
 	_isConnected = false;
 }
 
-void	Client::setFd(void)
-{
-	_fd = -1;
-}
-
 Request	Client::getReq(void)
 {
 	return _request;
 }
 
-ParseStatus	Client::parseRequest(char *buffer)
+ParseStatus	Client::parseRequest(char *buffer, const ServerConfig& serverConfig)
 {
 	_readBuffer.append(buffer);
 
-	ParseStatus status = _parser.parse(_readBuffer, _request);
+	ParseStatus status = _parser.parse(_readBuffer, _request, serverConfig.clientMaxBodySize);
 	if (status == COMPLETE)
 	{
 		_readBuffer.clear();
@@ -55,13 +50,11 @@ std::string Client::getWriteBuffer()
 void Client::prepareResponse(const ServerConfig& serverConfig)
 {
 	//status is not 0
-	if(_request.errtype != REQ_OK)
+	if(_request.httpStatus != REQ_OK)
 	{
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.errtype));
+		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
 	}
 	else
 		_response = _builder.buildResponse(_request, serverConfig);
 	_writeBuffer = _builder.serialize(_response);
 }
-
-

@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		Server server(configs[0]);
+		Server server(configs);
 		server.start();
 	}
 	catch (const std::exception& e)

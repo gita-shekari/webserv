@@ -24,7 +24,7 @@ class Server
 {
 	public:
 
-		Server(struct ServerConfig& config);
+		Server(const std::vector<ServerConfig>& config);
 		~Server(void);
 
 		int start();
@@ -49,14 +49,13 @@ class Server
 		{
 			const char* what() const noexcept override;
 		};
-		
+
 	private:
 		int							_socketFd;
 		bool						_isRunning;
 		std::vector<struct pollfd>	_pollfds;
 		std::map<int, Client>		_clients;
-		struct ServerConfig& 		_config;
-		// map container of fd and client connection
+		const std::vector<ServerConfig>&  _config;
 
 		Server(void);
 };

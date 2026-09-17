@@ -1,9 +1,8 @@
 #pragma once
 
-# include "Request.hpp"
+# include "Http.hpp"
 # include "RequestParser.hpp"
-#include  "Response.hpp"
-#include  "ResponseBuilder.hpp"
+# include  "ResponseBuilder.hpp"
 # include <string>
 # include <iostream>
 
@@ -19,10 +18,9 @@ class Client
 		Request		getReq(void);
 		std::string getWriteBuffer();
 		int			getFd(void);
-		void		setFd(void); // no need?
 
 		// for appending information in buffer
-		ParseStatus		parseRequest(char *buffer);
+		ParseStatus		parseRequest(char *buffer, const ServerConfig& ServerConfig);
 		void 			prepareResponse(const ServerConfig& serverConfig);
 
 	private:

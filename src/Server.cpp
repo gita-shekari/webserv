@@ -7,14 +7,14 @@
 #include <algorithm>
 #include <cerrno>
 
-Server::Server(struct ServerConfig& config)
+Server::Server(const std::vector<ServerConfig>& config)
 	: _socketFd(-1),
 	  _isRunning(false),
 	  _config(config)
 {
 	Logger::debug("server object created");
 }
-
+// Need server shutdown function.
 Server::~Server(void)
 {
 	if (this->_socketFd != -1)
@@ -104,7 +104,7 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
 
-		ParseStatus status = it->second.parseRequest(buffer);
+		ParseStatus status = it->second.parseRequest(buffer, _config[0]); // change index later on config
 		if (status == INCOMPLETE)
 			return 	false;
 		return true;
@@ -134,7 +134,7 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		}
 		return false;
 	}
-	return true;
+	return true; //?
 }
 bool	Server::sendClientData(int fd)
 {
@@ -229,7 +229,6 @@ void	Server::runningLoop(void)
 		{
 			short revents = _pollfds[i].revents;
 			int fd = _pollfds[i].fd;
-
 			// check revent error firstly;
 			if (revents == 0)
 			{
@@ -293,7 +292,7 @@ void	Server::runningLoop(void)
 					}
 					if (!receiveClientData(fd, it))
 						continue;
-					it->second.prepareResponse(_config);
+					it->second.prepareResponse(_config[0]);
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
 				}
@@ -361,7 +360,7 @@ void	Server::setsocket(void)
 	sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
 	// port number need to be replaced according to config
-	serverAddress.sin_port = htons(8080);
+	serverAddress.sin_port = htons(_config[0].port);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(this->_socketFd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
@@ -397,7 +396,7 @@ void	Server::setsocket(void)
 	}
 
 	this->_isRunning = true;
-	Logger::info("listening socket established");
+	Logger::info("listening socket established, at port: " + std::to_string(_config[0].port));
 }
 
 // do we need to return as int?
