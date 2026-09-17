@@ -20,7 +20,7 @@ class Client
 		int			getFd(void);
 
 		// for appending information in buffer
-		ParseStatus		parseRequest(char *buffer);
+		ParseStatus		parseRequest(char *buffer, const ServerConfig& ServerConfig);
 		void 			prepareResponse(const ServerConfig& serverConfig);
 
 	private:

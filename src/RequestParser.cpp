@@ -5,7 +5,7 @@
 
 RequestParser::RequestParser(): _section(REQUEST_LINE), _cursor(0), _contentLength(0), _body(NO_BODY), _chunkState(CHUNK_SIZE), _chunkSize(0){}
 
-ParseStatus	RequestParser::parse(const std::string& buffer, Request& req)
+ParseStatus	RequestParser::parse(const std::string& buffer, Request& req, size_t maxBodySize)
 {
 	while (_section != DONE)
 	{
@@ -16,7 +16,7 @@ ParseStatus	RequestParser::parse(const std::string& buffer, Request& req)
 		else if (_section == HEADERS)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
-			status = parseBody(buffer, req);
+			status = parseBody(buffer, req, maxBodySize);
 		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
@@ -161,12 +161,12 @@ ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 	return (judgeBody(req));
 }
 
-ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req)
+ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req, size_t maxBodySize)
 {
 	if (_body == CONTENT_LENGTH_BODY)
 		return parseContentLengthBody(buffer, req);
 	if (_body == CHUNKED_BODY)
-		return parseChunkedBody(buffer, req);
+		return parseChunkedBody(buffer, req, maxBodySize);
 	return ERROR;
 }
 
@@ -211,7 +211,7 @@ ParseStatus	RequestParser::parseContentLengthBody(const std::string& buffer, Req
 	return COMPLETE;
 }
 
-ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req)
+ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req, size_t maxBodySize)
 {
 	while (true)
 	{
@@ -251,8 +251,8 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				return INCOMPLETE;
 			if (buffer[_cursor + _chunkSize] != '\r' || buffer[_cursor + _chunkSize + 1] != '\n')
 				return error(req, BAD_REQ);
-			// if (req.body.size() > config.maxBodySize || _chunkSize > config.maxBodySize - req.body.size())
-			// 		return error(req, PLAYLOAD_TOO_LARGE)
+			if (req.body.size() > maxBodySize || _chunkSize > maxBodySize - req.body.size())
+				return error(req, PLAYLOAD_TOO_LARGE);
 			req.body.append(buffer, _cursor, _chunkSize);
 			_cursor += _chunkSize + 2;
 			_chunkState = CHUNK_SIZE;

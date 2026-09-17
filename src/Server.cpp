@@ -104,7 +104,7 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
 
-		ParseStatus status = it->second.parseRequest(buffer);
+		ParseStatus status = it->second.parseRequest(buffer, _config[0]); // change index later on config
 		if (status == INCOMPLETE)
 			return 	false;
 		return true;

@@ -32,11 +32,11 @@ Request	Client::getReq(void)
 	return _request;
 }
 
-ParseStatus	Client::parseRequest(char *buffer)
+ParseStatus	Client::parseRequest(char *buffer, const ServerConfig& serverConfig)
 {
 	_readBuffer.append(buffer);
 
-	ParseStatus status = _parser.parse(_readBuffer, _request);
+	ParseStatus status = _parser.parse(_readBuffer, _request, serverConfig.clientMaxBodySize);
 	if (status == COMPLETE)
 	{
 		_readBuffer.clear();
