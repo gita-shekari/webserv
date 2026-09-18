@@ -70,60 +70,60 @@ void	Server::runningLoop(void)
 			continue;
 		}
 
-		checkTimeouts();
+		eagainCount = 0;
 
-		if (res == 0)
-			continue ;
-
-		for (size_t i = 0; i < _pollfds.size(); i++)
+		if (res > 0)
 		{
-			short revents = _pollfds[i].revents;
-			int fd = _pollfds[i].fd;
-			
-			if (revents == 0)
-				continue;
-
-			if (handlePollException(fd, revents))
-				continue;
-
-			if (isListeningFd(fd))
+			for (size_t i = 0; i < _pollfds.size(); i++)
 			{
-				if (revents & POLLIN)
-					acceptNewClient(fd);
-				continue;
-			}
-
-			if (revents & POLLIN)
-			{
-				std::map<int, Client>::iterator it = _clients.find(fd);
-				if (it == _clients.end())
-				{
-					Logger::fatal("event registry invariant violated: poll fd="
-						+ std::to_string(fd) + " has no Client");
-					throw ServerException();
-				}
-				if (!receiveClientData(fd, it))
+				short revents = _pollfds[i].revents;
+				int fd = _pollfds[i].fd;
+				
+				if (revents == 0)
 					continue;
-				it->second.prepareResponse(_config[0]);
-				_pollfds[i].events |= POLLOUT;
-				//CGI processing
-			}
 
-			if (revents & POLLOUT)
-			{
-				if (sendClientData(fd))
+				if (handlePollException(fd, revents))
+					continue;
+
+				if (isListeningFd(fd))
 				{
-					_pollfds[i].events &= ~POLLOUT;
+					if (revents & POLLIN)
+						acceptNewClient(fd);
+					continue;
+				}
+
+				if (revents & POLLIN)
+				{
+					std::map<int, Client>::iterator it = _clients.find(fd);
+					if (it == _clients.end())
+					{
+						Logger::fatal("event registry invariant violated: poll fd="
+							+ std::to_string(fd) + " has no Client");
+						throw ServerException();
+					}
+					if (!receiveClientData(fd, it))
+						continue;
+					it->second.prepareResponse(_config[it->second.getConfigIndex()]);
+					_pollfds[i].events |= POLLOUT;
+					//CGI processing
+				}
+
+				if (revents & POLLOUT)
+				{
+					if (sendClientData(fd))
+					{
+						_pollfds[i].events &= ~POLLOUT;
+					}
 				}
 			}
 		}
+		checkTimeouts();
 		// need to remove closed fds from pollFds, also check how the macro works with revents.
 		removeCloseClient();
-		eagainCount = 0;
 	}
 }
 
-void	Server::handlePollCallError(int eagainCount)
+void	Server::handlePollCallError(int& eagainCount)
 {
 	const int errorNumber = errno;
 

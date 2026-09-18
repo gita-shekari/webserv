@@ -30,7 +30,7 @@ class Server
 
 		// system methods
 		void	runningLoop(void);
-		void 	handlePollCallError(int eagainCount);
+		void 	handlePollCallError(int& eagainCount);
 		bool	handlePollException(int fd, short revents);
 		void	addPollFds(int fd, short events);
 		bool	setNonBlocking(int fd);
