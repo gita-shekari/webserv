@@ -3,7 +3,8 @@
 Client::Client(int fd, size_t configIndex)
 	: _fd(fd),
 	  _configIndex(configIndex),
-	  _isConnected(true)
+	  _isConnected(true),
+	  _lastActivity(std::chrono::steady_clock::now())
 {
 	std::cout << "A client is created fd: " << fd << std::endl;
 }
@@ -28,9 +29,9 @@ bool	Client::getIsConnected(void)
 	return _isConnected;
 }
 
-void	Client::disConnected(void)
+std::string Client::getWriteBuffer()
 {
-	_isConnected = false;
+	return _writeBuffer;
 }
 
 Request	Client::getReq(void)
@@ -38,6 +39,15 @@ Request	Client::getReq(void)
 	return _request;
 }
 
+std::chrono::steady_clock::time_point	Client::getLastActivity(void) const
+{
+	return _lastActivity;
+}
+
+void	Client::disConnected(void)
+{
+	_isConnected = false;
+}
 ParseStatus	Client::parseRequest(char *buffer)
 {
 	_readBuffer.append(buffer);
@@ -50,11 +60,6 @@ ParseStatus	Client::parseRequest(char *buffer)
 	return status;
 }
 
-std::string Client::getWriteBuffer()
-{
-	return _writeBuffer;
-}
-
 void Client::prepareResponse(const ServerConfig& serverConfig)
 {
 	//status is not 0
@@ -65,4 +70,9 @@ void Client::prepareResponse(const ServerConfig& serverConfig)
 	else
 		_response = _builder.buildResponse(_request, serverConfig);
 	_writeBuffer = _builder.serialize(_response);
+}
+
+void	Client::updateLastActivity(void)
+{
+	_lastActivity = std::chrono::steady_clock::now();
 }

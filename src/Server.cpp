@@ -59,128 +59,143 @@ bool Server::getRunning(void)
 void	Server::runningLoop(void)
 {
 	int	eagainCount = 0;
+
 	while (_isRunning)
 	{
-		int res = poll(&_pollfds[0], _pollfds.size(), -1); //timeout?
+		int res = poll(&_pollfds[0], _pollfds.size(), POLL_TIMEOUT_MS);
 
-		if (res == 0)// timeout, no event happend;
-			continue;
-		else if (res == -1)
+		if (res == -1)
 		{
-			const int errorNumber = errno;
-			if (errorNumber == EINTR)
-			{
-				Logger::debug("poll interrupted; retrying");
-				continue;
-			}
-			else if (errorNumber == EAGAIN || errorNumber == ENOMEM)
-			{
-				if (eagainCount > 2)
-				{
-					Logger::systemError(Logger::FATAL,
-						"poll: resource exhaustion after retries", errorNumber);
-					throw ServerException();
-				}
-				else
-				{
-					eagainCount++;
-					Logger::systemError(Logger::WARNING,
-						"poll: temporary resource exhaustion; retrying", errorNumber);
-					continue;
-				}
-			}
-			else
-			{
-				Logger::systemError(Logger::FATAL, "poll failed", errorNumber);
-				throw ServerException();				
-			}
+			handlePollCallError(eagainCount);
+			continue;
 		}
+
+		checkTimeouts();
+
+		if (res == 0)
+			continue ;
 
 		for (size_t i = 0; i < _pollfds.size(); i++)
 		{
 			short revents = _pollfds[i].revents;
 			int fd = _pollfds[i].fd;
 			
-			// check revent error firstly;
 			if (revents == 0)
-			{
-				//checkTimeouts();
 				continue;
-			}
-			if (revents & POLLNVAL)
-			{
-				Logger::error("poll returned POLLNVAL: invalid registered fd="
-					+ std::to_string(fd) + " action=close_client");
-				if (isListeningFd(fd) || _clients.find(fd) == _clients.end())
-				{
-					Logger::fatal("event registry invariant violated: fd has no valid owner");
-					throw ServerException();
-				}
-				markForClose(fd);
+
+			if (handlePollException(fd, revents))
 				continue;
-			}
-			if (revents & POLLERR)
-			{
-				if (isListeningFd(fd))
-				{
-					Logger::fatal("listening socket reported POLLERR");
-					throw ServerException();
-				}
-				Logger::warning("client socket reported POLLERR: fd=" + std::to_string(fd)
-					+ " action=close_client");
-				markForClose(fd);
-				continue;
-			}
-			if (revents & POLLHUP)
-			{
-				if (isListeningFd(fd))
-				{
-					Logger::fatal("listening socket reported POLLHUP");
-					throw ServerException();
-				}
-				Logger::info("client socket hangup: fd=" + std::to_string(fd)
-					+ " action=close_client");
-				markForClose(fd);
-				continue;
-			}
 
 			if (isListeningFd(fd))
 			{
 				if (revents & POLLIN)
 					acceptNewClient(fd);
-				continue ;
+				continue;
 			}
-			else
+
+			if (revents & POLLIN)
 			{
-				if (revents & POLLIN)
+				std::map<int, Client>::iterator it = _clients.find(fd);
+				if (it == _clients.end())
 				{
-					std::map<int, Client>::iterator it = _clients.find(fd);
-					if (it == _clients.end())
-					{
-						Logger::fatal("event registry invariant violated: poll fd="
-							+ std::to_string(fd) + " has no Client");
-						throw ServerException();
-					}
-					if (!receiveClientData(fd, it))
-						continue;
-					it->second.prepareResponse(_config[0]);
-					_pollfds[i].events |= POLLOUT;
-					//CGI processing
+					Logger::fatal("event registry invariant violated: poll fd="
+						+ std::to_string(fd) + " has no Client");
+					throw ServerException();
 				}
-				if (revents & POLLOUT)
+				if (!receiveClientData(fd, it))
+					continue;
+				it->second.prepareResponse(_config[0]);
+				_pollfds[i].events |= POLLOUT;
+				//CGI processing
+			}
+
+			if (revents & POLLOUT)
+			{
+				if (sendClientData(fd))
 				{
-					if (sendClientData(fd))
-					{
-						_pollfds[i].events &= ~POLLOUT;
-					}
+					_pollfds[i].events &= ~POLLOUT;
 				}
 			}
-			//checkTimeouts();
 		}
 		// need to remove closed fds from pollFds, also check how the macro works with revents.
 		removeCloseClient();
 		eagainCount = 0;
 	}
+}
+
+void	Server::handlePollCallError(int eagainCount)
+{
+	const int errorNumber = errno;
+
+	if (errorNumber == EINTR)
+	{
+		Logger::debug("poll interrupted; retrying");
+		return;
+	}
+
+	if (errorNumber == EAGAIN || errorNumber == ENOMEM)
+	{
+		if (eagainCount > 2)
+		{
+			Logger::systemError(Logger::FATAL,
+				"poll: resource exhaustion after retries", errorNumber);
+			throw ServerException();
+		}
+		eagainCount++;
+		Logger::systemError(Logger::WARNING,
+			"poll: temporary resource exhaustion; retrying", errorNumber);
+		return;
+	}
+	Logger::systemError(Logger::FATAL, "poll failed", errorNumber);
+	throw ServerException();
+}
+
+bool	Server::handlePollException(int fd, short revents)
+{
+	if (!(revents & (POLLNVAL | POLLERR | POLLHUP)))
+		return false; // no exceptions found, continue with runningLoop()
+	if (!isListeningFd(fd) && !isClientFd(fd))
+	{
+		Logger::fatal("event registry invariant violated: fd has no valid owner");
+		throw ServerException();
+	}
+	if (revents & POLLNVAL)
+	{
+		if (isListeningFd(fd))
+		{
+			Logger::fatal("listening socket reported POLLNVAL");
+			throw ServerException();
+		}
+		Logger::error("poll returned POLLNVAL: invalid registered fd="
+			+ std::to_string(fd) + " action=close_client");
+		markForClose(fd);
+		return true;
+	}
+	if (revents & POLLERR)
+	{
+		if (isListeningFd(fd))
+		{
+			Logger::fatal("listening socket reported POLLERR");
+			throw ServerException();
+		}
+		Logger::warning("client socket reported POLLERR: fd="
+			+ std::to_string(fd) + " action=close_client");
+		markForClose(fd);
+		return true;
+	}
+	if (revents & POLLHUP)
+	{
+		if (isListeningFd(fd))
+		{
+			Logger::fatal("listening socket reported POLLHUP");
+			throw ServerException();
+		}
+		Logger::info("client socket hangup: fd="
+			+ std::to_string(fd) + " action=close_client");
+		markForClose(fd);
+		return true;
+	}
+	return false;
 }
 
 void	Server::addPollFds(int fd, short events)
@@ -332,43 +347,59 @@ void	Server::acceptNewClient(int listenerFd)
 {
 	//struct sockaddr_in clientAddr;
 	//socklen_t len = sizeof(clientAddr);
-	
-	int clientFd = accept(listenerFd, NULL, NULL);
-	if (clientFd == -1)
+	std::map<int, size_t>::iterator listenerIt = _listeners.find(listenerFd);
+	if (listenerIt == _listeners.end())
 	{
-		const int errorNumber = errno;
-		// if we set socket as O_NONBLOCK, then no connection is ready can return -1
-		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
-			return;
-		if (errorNumber == EINTR)
-			Logger::debug("accept interrupted; retry on the next event");
-		else if (errorNumber == EMFILE || errorNumber == ENFILE)
-			Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
-		else if (errorNumber == EBADF || errorNumber == ENOTSOCK)
+		Logger::fatal("acceptNewClient called with unknown listener fd");
+		throw ServerException();
+	}
+	// drain all pending connections
+	while (true)
+	{
+		int clientFd = accept(listenerFd, NULL, NULL);
+		
+		if (clientFd == -1)
 		{
-			Logger::systemError(Logger::FATAL, "accept: invalid listening socket", errorNumber);
-			throw ServerException();
-		}
-		else
+			const int errorNumber = errno;
+			if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+				return; // no more pending clients in the accept queue
+			if (errorNumber == EINTR)
+			{
+				Logger::debug("accept interrupted; retrying");
+				continue;
+			}			
+			if (errorNumber == EMFILE || errorNumber == ENFILE)
+			{
+				Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
+				return;
+			}
+			if (errorNumber == EBADF || errorNumber == ENOTSOCK)
+			{
+				Logger::systemError(Logger::FATAL, "accept: invalid listening socket", errorNumber);
+				throw ServerException();
+			}
 			Logger::systemError(Logger::WARNING, "accept failed", errorNumber);
-		return ;
+			return;
+		}
+
+		if (!setNonBlocking(clientFd))
+		{
+			close(clientFd);
+			continue;
+		}
+
+		addPollFds(clientFd, POLLIN);
+
+		size_t	configIndex = listenerIt->second;
+		_clients[clientFd] = Client(clientFd, configIndex);
+
+		Logger::debug("client connected: fd=" + std::to_string(clientFd));
 	}
+}
 
-	size_t	configIndex = _listeners.find(listenerFd)->second;
-
-	if (!setNonBlocking(clientFd))
-	{
-		close(clientFd);
-		return ;
-	}
-	addPollFds(clientFd, POLLIN);
-
-	// create instance of client/connection class.
-
-	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line. 
-	_clients[clientFd] = Client(clientFd, configIndex);
-
-	Logger::debug("client connected: fd=" + std::to_string(clientFd));
+bool	Server::isClientFd(int fd) const
+{
+	return _clients.find(fd) != _clients.end();
 }
 
 template <typename ClientsIt>
@@ -380,9 +411,9 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 
 	if (bytesReceived > 0)
 	{
+		it->second.updateLastActivity();
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
-		
 		ParseStatus status = it->second.parseRequest(buffer);
 		if (status == INCOMPLETE)
 			return false;
@@ -448,6 +479,8 @@ bool	Server::sendClientData(int fd)
 	// 	return true;
 	const std::string &buffer = it->second.getWriteBuffer();
 	ssize_t bytesSent = send(fd,buffer.c_str(), buffer.size(),0);
+	if (bytesSent > 0)
+		it->second.updateLastActivity();
 	if (bytesSent < 0)
 		return false;
 		return true;
@@ -480,6 +513,27 @@ void	Server::removeCloseClient(void)
 		else
 		{
 			++it;
+		}
+	}
+}
+
+void	Server::checkTimeouts(void)
+{
+	std::chrono::steady_clock::time_point now
+		 = std::chrono::steady_clock::now();
+	for (std::map<int, Client>::iterator it = _clients.begin();
+		it != _clients.end(); ++it)
+	{
+		std::chrono::seconds idleTime =
+			std::chrono::duration_cast<std::chrono::seconds>(
+				now - it->second.getLastActivity());
+		if (idleTime.count() >= CLIENT_TIMEOUT_SEC)
+		{
+			Logger::info(
+				"Client timeout: fd=" + std::to_string(it->first)
+				+ " action=close_client"
+			);
+			markForClose(it->first);
 		}
 	}
 }
