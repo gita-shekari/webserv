@@ -1,9 +1,10 @@
 #include "ConfigParser.hpp"
 
-ConfigParser::ConfigParser()
-{
+#include <fstream>
+#include <cctype>
 
-}
+ConfigParser::ConfigParser(){}
+
 void ConfigParser::tokenize(std::ifstream& file)
 {
 	std::string line;

@@ -1,9 +1,19 @@
 NAME = webserv
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror
+CXXFLAGS = -Wall -Wextra -Werror -std=c++11
 
-SRC = $(shell find src -type f -name '*.cpp')
+SRC = \
+	src/Client.cpp \
+	src/ConfigParser.cpp \
+	src/Http.cpp \
+	src/Logger.cpp \
+	src/RequestParser.cpp \
+	src/ResponseBuilder.cpp \
+	src/Server.cpp \
+	src/main.cpp
+#	test_files/server_nonblocking.cpp
+
 OBJ = $(SRC:.cpp=.o)
 
 INCLUDE = -Iinclude

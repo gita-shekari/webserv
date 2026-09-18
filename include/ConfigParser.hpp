@@ -2,18 +2,8 @@
 
 #include "Config.hpp"
 #include <string>
-#include <iostream>
-#include <fstream>
-#include <map>
 #include <vector>
-#pragma once
 
-#include "Config.hpp"
-
-#include <string>
-#include <vector>
-#include <fstream>
-#include <cctype>
 class ConfigParser
 {
 	private:
@@ -24,6 +14,7 @@ class ConfigParser
 		LocationConfig				parseLocation();
 		const std::string&			currentToken() const;
 		bool						isValidPort(const std::string& token);
+	
 	public:
 		ConfigParser();
 		std::vector<ServerConfig>	parseConfig(const std::string& filename);

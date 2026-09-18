@@ -1,19 +1,25 @@
 #include "Server.hpp"
+
 // for socket;
 #include <netinet/in.h> 
 #include <sys/socket.h>
-#include <unistd.h> // for closing socket
-#include <vector>
+
+// for closing socket
+#include <unistd.h>
+
+// for non blocking
+#include <fcntl.h> 
+
 #include <algorithm>
 #include <cerrno>
-#include <fcntl.h> // for non blocking
 
 Server::Server(const std::vector<ServerConfig>& config)
 	: _isRunning(false),
-	  _configs(config)
+	  _config(config)
 {
 	Logger::debug("server object created");
 }
+
 // Need server shutdown function.
 Server::~Server(void)
 {
@@ -30,193 +36,24 @@ Server::~Server(void)
 	Logger::info("server stopped");
 }
 
-bool	Server::setNonBlocking(int fd)
+// do we need to return as int?
+int Server::start(void)
 {
-	int flags = fcntl(fd, F_GETFL, 0);
-
-	if (flags == -1)
+	try
 	{
-		const int	errorNumber = errno;
-		Logger::systemError(
-			Logger::ERROR,
-			"fcntl F_GETFL failed",
-			errorNumber
-		);
-		return false;
+		setListeningSockets(); // error happen will throw exception
+		runningLoop();
 	}
-
-	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	catch(const std::exception& e)
 	{
-		const int	errorNumber = errno;
-		Logger::systemError(
-			Logger::ERROR,
-			"fcntl F_SETFL O_NONBLOCK failed",
-			errorNumber
-		);
-		return false;
+		return 1;
 	}
-	return true;
+	return 0;
 }
 
 bool Server::getRunning(void)
 {
 	return this->_isRunning;
-}
-
-void	Server::markForClose(int fd)
-{
-	Logger::debug("marking client for close: fd=" + std::to_string(fd));
-	// shouldn't do this because it might create a client if it doent exist;
-	//_clients[fd].Client::disConnected();
-
-	std::map<int, Client>::iterator it = _clients.find(fd);
-	if (it != _clients.end())
-	{
-		it->second.disConnected();
-	}
-	else
-	{
-		Logger::fatal("client registry invariant violated: cannot close unknown fd="
-			+ std::to_string(fd));
-		throw ServerException();
-	}
-}
-
-void	Server::acceptNewClient(int listenerFd)
-{
-	//struct sockaddr_in clientAddr;
-	//socklen_t len = sizeof(clientAddr);
-	
-	int clientFd = accept(listenerFd, NULL, NULL);
-	if (clientFd == -1)
-	{
-		const int errorNumber = errno;
-		// if we set socket as O_NONBLOCK, then no connection is ready can return -1
-		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
-			return;
-		if (errorNumber == EINTR)
-			Logger::debug("accept interrupted; retry on the next event");
-		else if (errorNumber == EMFILE || errorNumber == ENFILE)
-			Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
-		else if (errorNumber == EBADF || errorNumber == ENOTSOCK)
-		{
-			Logger::systemError(Logger::FATAL, "accept: invalid listening socket", errorNumber);
-			throw ServerException();
-		}
-		else
-			Logger::systemError(Logger::WARNING, "accept failed", errorNumber);
-		return ;
-	}
-
-	size_t	configIndex = _listeners.find(listenerFd)->second;
-
-	if (!setNonBlocking(clientFd))
-	{
-		close(clientFd);
-		return ;
-	}
-	addPollFds(clientFd, POLLIN);
-
-	// create instance of client/connection class.
-
-	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line. 
-	_clients[clientFd] = Client(clientFd, configIndex);
-
-	Logger::debug("client connected: fd=" + std::to_string(clientFd));
-}
-
-template <typename ClientsIt>
-bool	Server::receiveClientData(int fd, ClientsIt it)
-{
-	char buffer[1024] = {0};
-
-	ssize_t bytesReceived = recv(fd, buffer, sizeof(buffer) - 1, 0);
-
-	if (bytesReceived > 0)
-	{
-		Logger::debug("received client data: fd=" + std::to_string(fd)
-			+ " bytes=" + std::to_string(bytesReceived));
-		
-		ParseStatus status = it->second.parseRequest(buffer);
-		if (status == INCOMPLETE)
-			return false;
-		return true;
-	}
-	else if (bytesReceived == 0)
-	{
-		Logger::debug("client closed connection: fd=" + std::to_string(fd));
-		markForClose(fd);
-		return false;
-	}
-	else
-	{
-		const int errorNumber = errno;
-		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
-			return false;
-		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
-		{
-			markForClose(fd);
-			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
-		}
-		else if (errorNumber == EINTR)
-			Logger::debug("recv interrupted; retry on the next event");
- 		else
-		{
-			Logger::systemError(Logger::ERROR, "recv failed", errorNumber);
-			markForClose(fd);
-		}
-		return false;
-	}
-	return true; //?
-}
-
-bool	Server::sendClientData(int fd)
-{
-	Logger::debug("response ready to send: fd=" + std::to_string(fd));
-	std::map<int, Client>::iterator it = _clients.find(fd);
-	if(it == _clients.end())
-		return false;
-	// also need to remove from pollfds and another things.
-	// if (fd < 0) // if finish sending the data, then return true.
-	// 	return false;
-	// else
-	// 	return true;
-	const std::string &buffer = it->second.getWriteBuffer();
-	ssize_t bytesSent = send(fd,buffer.c_str(), buffer.size(),0);
-	if (bytesSent < 0)
-		return false;
-		return true;
-}
-
-void	Server::removeCloseClient(void)
-{
-	std::map<int, Client>::iterator it = _clients.begin();
-	while (it != _clients.end())
-	{
-		if (!it->second.getIsConnected())
-		{
-			int closeFd = it->second.getFd();
-			std::vector<struct pollfd>::iterator pfdIt = _pollfds.begin();
-			while (pfdIt != _pollfds.end())
-			{
-				if (pfdIt->fd == closeFd)
-				{
-					pfdIt = _pollfds.erase(pfdIt);
-					break;
-				}
-				else
-				{
-					++pfdIt;
-				}
-			}
-			it = _clients.erase(it);
-			close(closeFd);
-		}
-		else
-		{
-			++it;
-		}
-	}
 }
 
 void	Server::runningLoop(void)
@@ -355,16 +192,39 @@ void	Server::addPollFds(int fd, short events)
 	_pollfds.push_back(socket);
 }
 
+bool	Server::setNonBlocking(int fd)
+{
+	int flags = fcntl(fd, F_GETFL, 0);
+
+	if (flags == -1)
+	{
+		const int	errorNumber = errno;
+		Logger::systemError(
+			Logger::ERROR,
+			"fcntl F_GETFL failed",
+			errorNumber
+		);
+		return false;
+	}
+
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	{
+		const int	errorNumber = errno;
+		Logger::systemError(
+			Logger::ERROR,
+			"fcntl F_SETFL O_NONBLOCK failed",
+			errorNumber
+		);
+		return false;
+	}
+	return true;
+}
+
 void	Server::setListeningSockets(void)
 {
-	if (_configs.empty())
+	for (size_t i = 0; i < _config.size(); ++i)
 	{
-		Logger::fatal("no server configuration available");
-		throw ServerException();
-	}
-	for (size_t i = 0; i < _configs.size(); ++i)
-	{
-		int	fd = createListeningSocket(_configs[i]);
+		int	fd = createListeningSocket(_config[i]);
 		_listeners[fd] = i;
 		addPollFds(fd, POLLIN);
 	}
@@ -402,6 +262,7 @@ int		Server::createListeningSocket(const ServerConfig& config)
 		close(fd);
 		throw ServerException();
 	}
+
 	// allow immediate restart after server shutdown.
 	#ifdef __APPLE__
 	int no_sigpipe = 1;
@@ -415,7 +276,7 @@ int		Server::createListeningSocket(const ServerConfig& config)
 	sockaddr_in serverAddress = {};
 	serverAddress.sin_family = AF_INET;
 	// port number need to be replaced according to config 
-	serverAddress.sin_port = htons(_config[0].port);
+	serverAddress.sin_port = htons(config.port);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(fd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
@@ -454,7 +315,7 @@ int		Server::createListeningSocket(const ServerConfig& config)
 
 	Logger::info(
 	"listening socket established on port="
-	+ std::to_string(_config[0].port)
+	+ std::to_string(config.port)
 	+ " fd="
 	+ std::to_string(fd)
 	);
@@ -467,19 +328,160 @@ bool	Server::isListeningFd(int fd) const
 	return _listeners.find(fd) != _listeners.end();
 }
 
-// do we need to return as int?
-int Server::start(void)
+void	Server::acceptNewClient(int listenerFd)
 {
-	try
+	//struct sockaddr_in clientAddr;
+	//socklen_t len = sizeof(clientAddr);
+	
+	int clientFd = accept(listenerFd, NULL, NULL);
+	if (clientFd == -1)
 	{
-		setListeningSockets(); // error happen will throw exception
-		runningLoop();
+		const int errorNumber = errno;
+		// if we set socket as O_NONBLOCK, then no connection is ready can return -1
+		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+			return;
+		if (errorNumber == EINTR)
+			Logger::debug("accept interrupted; retry on the next event");
+		else if (errorNumber == EMFILE || errorNumber == ENFILE)
+			Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
+		else if (errorNumber == EBADF || errorNumber == ENOTSOCK)
+		{
+			Logger::systemError(Logger::FATAL, "accept: invalid listening socket", errorNumber);
+			throw ServerException();
+		}
+		else
+			Logger::systemError(Logger::WARNING, "accept failed", errorNumber);
+		return ;
 	}
-	catch(const std::exception& e)
+
+	size_t	configIndex = _listeners.find(listenerFd)->second;
+
+	if (!setNonBlocking(clientFd))
 	{
-		return 1;
+		close(clientFd);
+		return ;
 	}
-	return 0;
+	addPollFds(clientFd, POLLIN);
+
+	// create instance of client/connection class.
+
+	//_clients.insert(std::make_pair(clientFd, Client(clientFd))); --> because we have a default consructor for client, we don't have to use make_pair and insert. we can just use map operator[] because when there is no such key, it would create one and copy the Client(clientFd) into it, the Client(clientFd) will be destroyed after the this line. 
+	_clients[clientFd] = Client(clientFd, configIndex);
+
+	Logger::debug("client connected: fd=" + std::to_string(clientFd));
+}
+
+template <typename ClientsIt>
+bool	Server::receiveClientData(int fd, ClientsIt it)
+{
+	char buffer[1024] = {0};
+
+	ssize_t bytesReceived = recv(fd, buffer, sizeof(buffer) - 1, 0);
+
+	if (bytesReceived > 0)
+	{
+		Logger::debug("received client data: fd=" + std::to_string(fd)
+			+ " bytes=" + std::to_string(bytesReceived));
+		
+		ParseStatus status = it->second.parseRequest(buffer);
+		if (status == INCOMPLETE)
+			return false;
+		return true;
+	}
+	else if (bytesReceived == 0)
+	{
+		Logger::debug("client closed connection: fd=" + std::to_string(fd));
+		markForClose(fd);
+		return false;
+	}
+	else
+	{
+		const int errorNumber = errno;
+		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+			return false;
+		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
+		{
+			markForClose(fd);
+			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
+		}
+		else if (errorNumber == EINTR)
+			Logger::debug("recv interrupted; retry on the next event");
+ 		else
+		{
+			Logger::systemError(Logger::ERROR, "recv failed", errorNumber);
+			markForClose(fd);
+		}
+		return false;
+	}
+	return true; //?
+}
+
+void	Server::markForClose(int fd)
+{
+	Logger::debug("marking client for close: fd=" + std::to_string(fd));
+	// shouldn't do this because it might create a client if it doent exist;
+	//_clients[fd].Client::disConnected();
+
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if (it != _clients.end())
+	{
+		it->second.disConnected();
+	}
+	else
+	{
+		Logger::fatal("client registry invariant violated: cannot close unknown fd="
+			+ std::to_string(fd));
+		throw ServerException();
+	}
+}
+
+bool	Server::sendClientData(int fd)
+{
+	Logger::debug("response ready to send: fd=" + std::to_string(fd));
+	std::map<int, Client>::iterator it = _clients.find(fd);
+	if(it == _clients.end())
+		return false;
+	// also need to remove from pollfds and another things.
+	// if (fd < 0) // if finish sending the data, then return true.
+	// 	return false;
+	// else
+	// 	return true;
+	const std::string &buffer = it->second.getWriteBuffer();
+	ssize_t bytesSent = send(fd,buffer.c_str(), buffer.size(),0);
+	if (bytesSent < 0)
+		return false;
+		return true;
+}
+
+void	Server::removeCloseClient(void)
+{
+	std::map<int, Client>::iterator it = _clients.begin();
+	while (it != _clients.end())
+	{
+		if (!it->second.getIsConnected())
+		{
+			int closeFd = it->second.getFd();
+			std::vector<struct pollfd>::iterator pfdIt = _pollfds.begin();
+			while (pfdIt != _pollfds.end())
+			{
+				if (pfdIt->fd == closeFd)
+				{
+					pfdIt = _pollfds.erase(pfdIt);
+					break;
+				}
+				else
+				{
+					++pfdIt;
+				}
+			}
+			it = _clients.erase(it);
+			close(closeFd);
+		}
+		else
+		{
+			++it;
+		}
+	}
 }
 
 const char* Server::ServerException::what() const noexcept
