@@ -413,7 +413,7 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		it->second.updateLastActivity();
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
-		ParseStatus status = it->second.parseRequest(buffer, _config[0]);
+		ParseStatus status = it->second.parseRequest(buffer, _config[it->second.getConfigIndex()]);
 		if (status == INCOMPLETE)
 			return false;
 		return true;
@@ -443,7 +443,6 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		}
 		return false;
 	}
-	return true; //?
 }
 
 void	Server::markForClose(int fd)
