@@ -117,6 +117,62 @@ LocationConfig ConfigParser::parseLocation()
 	_current++;
 	return lc;
 }
+
+bool	parseMaxSize(size_t& size, std::string& input)
+{
+	if (input == "0")
+	{
+		size = ABS_MAX_CAP_BODY_SIZE;
+		return (true);
+	}
+	size_t	i = 0;
+	unsigned long long parse_val = 0;
+	try
+	{
+		parse_val = std::stoull(input, &i);
+	}
+	catch(const std::exception& e)
+	{
+		std::cerr << "Error parsing client_max_size: " << e.what() << '\n';
+		return false;
+	}
+	size_t	multiplier = 1;
+	if (i < input.size())
+	{
+		char unit = std::tolower(input[i]);
+		if (input.size() - i > 1)
+		{
+			std::cerr << "Config Error: invaild trailing charaters in size units " << input[i] << std::endl;
+			return false;
+		}
+		if (unit == 'k')
+			multiplier = 1024;
+		else if (unit == 'm')
+			multiplier = 1024 * 1024;
+		else if (unit == 'g')
+			multiplier = 1024 * 1024 * 1024;
+		else 
+		{
+			std::cerr << "Config Error: unknown unit suffix" << std::endl;
+			return false;
+		}
+	}
+
+	if (parse_val > std::numeric_limits<size_t>::max() / multiplier)
+	{
+		std::cerr << "Config Error: client_max_body_size number overflow" << std::endl;
+		return false;
+	}
+	size_t res = parse_val * multiplier;
+	if (res > ABS_MAX_CAP_BODY_SIZE)
+	{
+		std::cerr << "Config Error: client_max_body_size exceeds the server's memory buffer cap of 100 M. " << std::endl;
+		return false;
+	}
+	size = res;
+	return true;
+}
+
 ServerConfig ConfigParser::parseServer()
 {
 	ServerConfig sc;
@@ -152,6 +208,29 @@ ServerConfig ConfigParser::parseServer()
 				throw std::runtime_error("Expected ';' after root");
 			_current++;
 		}
+		else if (_tokens[_current] == "client_max_body_size")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Missing Max body size");
+			if (!parseMaxSize(sc.client_max_body_size, _tokens[_current]))
+				throw std::runtime_error("");
+			_current++;
+			if (_current >= _tokens.size() || _tokens[_current] != ";")
+				throw std::runtime_error("Expected ';' after root");
+			_current++;
+		}
+		else if (_tokens[_current] == "error_page")
+		{
+			_current++;
+			if (_current >= _tokens.size())
+				throw std::runtime_error("Missing error_page");
+			sc.error_page = _tokens[_current];
+			_current++;
+			if (_current >= _tokens.size() || _tokens[_current] != ";")
+				throw std::runtime_error("Expected ';' after root");
+			_current++;
+		}
 		else if (_tokens[_current] == "location")
 			sc.locations.push_back(parseLocation());
 		else
@@ -160,15 +239,19 @@ ServerConfig ConfigParser::parseServer()
 	if (_current >= _tokens.size())
 		throw std::runtime_error("Missing '}' for server block");
 	_current++;
-	// std::cout
-	// 	<< "port="
-	// 	<< sc.port
-	// 	<< ", root="
-	// 	<< sc.root;
-	// 	std::cout << ", locations=";
-	// 	for(size_t i = 0; i < sc.locations.size(); i++)
-	// 		std::cout << sc.locations[i].path;
-	// 	std::cout << std::endl;
+	std::cout
+		<< "port="
+		<< sc.port
+		<< ", root="
+		<< sc.root
+		<< ", max="
+		<< sc.client_max_body_size
+		<< ", error_page="
+		<< sc.error_page;
+		std::cout << ", locations=";
+		for(size_t i = 0; i < sc.locations.size(); i++)
+			std::cout << sc.locations[i].path;
+		std::cout << std::endl;
 	return sc;
 }
 std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)

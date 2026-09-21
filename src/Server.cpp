@@ -19,7 +19,6 @@ Server::Server(const std::vector<ServerConfig>& config)
 {
 	Logger::debug("server object created");
 }
-
 // Need server shutdown function.
 Server::~Server(void)
 {

@@ -157,7 +157,7 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 //	HTTP_VERSION_NOT_NSUP = 505
 //};
 
-Response ResponseBuilder::buildErrorResponse(int statusCode)
+Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig& serverConfig)
 {
 	Response response;
 
@@ -181,20 +181,22 @@ Response ResponseBuilder::buildErrorResponse(int statusCode)
 		response.statusCode = 500;
 		response.reasonPhrase = "Internal Server Error";
 	}
-
-	response.body =
+	std::string path = serverConfig.root + "/" + serverConfig.error_page;
+	if (!getSource(path, response.body))
+	{
+		response.body = "<html><body><h1>Error</h1></body></html>";
+	}
 	response.headers["Content-Type"] = "text/html";
-	response.headers["Content-Length"] =
-		std::to_string(response.body.size());
+	response.headers["Content-Length"] = std::to_string(response.body.size());
 	return response;
 }
 Response ResponseBuilder::buildResponse(const Request& request, const ServerConfig& serverConfig)
 {
 
-	if(request.method == "GET")
-	{
+	//if(request.method == "GET")
+	//{
 		return (buildGetResponse(request, serverConfig));
-	}
+	//}
 	// else if(request.method == "POST")
 	// {
 
@@ -204,6 +206,6 @@ Response ResponseBuilder::buildResponse(const Request& request, const ServerConf
 
 	// }
 
-	return (buildErrorResponse(static_cast<int>(request.httpStatus)));
+	//return (buildErrorResponse(static_cast<int>(request.httpStatus)), serverConfig);
 }
 

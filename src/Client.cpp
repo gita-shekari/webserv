@@ -52,7 +52,7 @@ ParseStatus	Client::parseRequest(char *buffer, const ServerConfig& serverConfig)
 {
 	_readBuffer.append(buffer);
 
-	ParseStatus status = _parser.parse(_readBuffer, _request, serverConfig.clientMaxBodySize);
+	ParseStatus status = _parser.parse(_readBuffer, _request, serverConfig.client_max_body_size);
 	if (status == COMPLETE)
 	{
 		_readBuffer.clear();
@@ -64,7 +64,7 @@ void Client::prepareResponse(const ServerConfig& serverConfig)
 	//status is not 0
 	if(_request.httpStatus != REQ_OK)
 	{
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus));
+		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
 	}
 	else
 		_response = _builder.buildResponse(_request, serverConfig);
