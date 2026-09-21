@@ -1,12 +1,10 @@
 NAME = webserv
 
 CXX = c++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++11
+CXXFLAGS = -Wall -Wextra -Werror
 
-SRC := $(shell find src -type f -name '*.cpp')
-OBJ := $(SRC:.cpp=.o)
-
-INCLUDE = -Iinclude
+SRC = main.cpp webserv.cpp
+OBJ = $(SRC:.cpp=.o)
 
 all: $(NAME)
 
@@ -14,7 +12,7 @@ $(NAME): $(OBJ)
 	$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJ)

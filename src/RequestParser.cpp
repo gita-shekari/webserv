@@ -75,9 +75,9 @@ void	RequestParser::printAttributes() const
 	std::cout << "--->" << std::endl;
 }
 
-ParseStatus RequestParser::error(Request& req, HttpStatus err)
+ParseStatus RequestParser::error(Request& req, HttpStatus status)
 {
-	req.httpStatus = err;
+	req.httpStatus = status;
 	return ERROR;
 }
 
@@ -98,6 +98,7 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 		|| secondSpace == firstSpace + 1
 		|| secondSpace + 1 >= line.size())
 		return error(req, BAD_REQ);
+		
 	req.method = line.substr(0, firstSpace);
 	req.rawTarget = line.substr(firstSpace + 1, secondSpace - firstSpace - 1);
 	req.version = line.substr(secondSpace + 1);

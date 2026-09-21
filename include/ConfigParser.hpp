@@ -6,14 +6,8 @@
 #include <fstream>
 #include <map>
 #include <vector>
-#pragma once
-
-#include "Config.hpp"
-
-#include <string>
-#include <vector>
-#include <fstream>
 #include <cctype>
+
 class ConfigParser
 {
 	private:

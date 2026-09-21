@@ -10,7 +10,7 @@ int main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 
-	if(argc > 2)
+	if (argc > 2)
 	{
 		std::cerr << "Usage: ./webserv <config_file>" << std::endl;
 		return 1;
@@ -23,7 +23,9 @@ int main(int argc, char **argv)
 	try
 	{
 		ConfigParser parser;
+		// parseConfig need to adapt error_page
 		std::vector<ServerConfig> configs = parser.parseConfig(file);
+
 		Logger::info("configuration parsed successfully: " + file);
 		if (configs.empty())
 		{
