@@ -118,6 +118,7 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 	return COMPLETE;
 }
 
+//TODO:	content-length if exist, can check for client_max_body_size. add a layer to fiind host and find the server and location to check for client_max_body_size before doing body parsing.
 ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 {
 	size_t	headerEnd = buffer.find("\r\n\r\n", _cursor);

@@ -63,7 +63,7 @@ const LocationConfig* ResponseBuilder::findLocation(const std::string& path, con
 	std::vector<LocationConfig>::const_iterator it;
 	for(it = serverConfig.locations.begin(); it != serverConfig.locations.end(); it++)
 	{
-		if(it->path == path)
+		if(it->path == path) // exact same path. but we need the most matched one. path.compare() and be aware of boundray. 
 			return &(*it);
 	}
 	return NULL;

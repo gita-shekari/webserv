@@ -12,12 +12,12 @@
 		2. application middleware: e.g. in node.js set up for a buffer space limitation
 	4. Architectural alternative for massive payloads (directly to cloud storage - presigned URL for large one; or a chunked / Muiltipart streaming)
 4. rules and configs for URL/route for a website
-	1. list of accepted HTTP methods for the route
-	2. HTTP redirection
-	3. Directory ( the requested file should be located)
-	4. enable or disable directory listing
+	1. list of accepted HTTP methods for the route -- methods
+	2. HTTP redirection -- return 
+	3. Directory ( the requested file should be located) 
+	4. enable or disable directory listing -- autoindex
 	5. default file to serve when the requested resource is a directory
-	6. uploading files from a client to server is authorized, and storage location is provided
+	6. uploading files from a client to server is authorized, and storage location is provided -- upload_store
 	7. execution of CGI
 		1. file extention? 
 		2. enviroment variable in webserver-CGI communicaiton
@@ -31,6 +31,3 @@
 words space punctuation newline word space punctuation newline 
 special symbols(like delimiters -- EOF \n \t whitespace)
 
-different types of tokenizers
-1. whitespace - punctuation after words
-2. Regex-based
