@@ -68,82 +68,69 @@ const LocationConfig* ResponseBuilder::findLocation(const std::string& path, con
 	}
 	return NULL;
 }
-Response ResponseBuilder::buildGetResponse(const Request& request, const ServerConfig& serverConfig)
+bool ResponseBuilder::isMethodAllowed(const std::string& method, const LocationConfig& location)
+{
+	std::vector<std::string>::const_iterator it;
+	for (it = location.methods.begin(); it != location.methods.end(); ++it)
+	{
+		if (*it == method)
+			return true;
+	}
+	return false;
+}
+std::string ResponseBuilder::resolveRoot(const ServerConfig& serverConfig, const LocationConfig& location)
+{
+	if (!location.root.empty())
+		return location.root;
+	return serverConfig.root;
+}
+std::string ResponseBuilder::resolveIndex(const ServerConfig& serverConfig, const LocationConfig& location)
+{
+	if (!location.index.empty())
+		return location.index;
+	return serverConfig.index;
+}
+Response ResponseBuilder::buildGetResponse(const Request& request, const ServerConfig& serverConfig, const LocationConfig& location)
 {
 	Response response;
 	response.version = "HTTP/1.1";
 
-	const LocationConfig *location = findLocation(request.path, serverConfig);
-	if (location == NULL)
-	{
-		response.statusCode = 404;
-		response.reasonPhrase = "Not Found";
-		response.body = "Not Found";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] = std::to_string(response.body.size());
-		return response;
-	}
-	// 1. Check GET is allowed
-	bool getAllowed = false;
-	std::vector<std::string>::const_iterator it;
-	for (it = location->methods.begin();
-		 it != location->methods.end();
-		 ++it)
-	{
-		if (*it == "GET")
-		{
-			getAllowed = true;
-			break;
-		}
-	}
-	if (!getAllowed)
-	{
-		response.statusCode = 405;
-		response.reasonPhrase = "Method Not Allowed";
-		response.body = "Method Not Allowed";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] =
-			std::to_string(response.body.size());
-		return response;
-	}
-	// 2. Resolve root
-	std::string root;
-
-	if (!location->root.empty())
-		root = location->root;
-	else
-		root = serverConfig.root;
-	// 3. Resolve index
-	std::string index;
-	if (!location->index.empty())
-		index = location->index;
-	else
-		index = serverConfig.index;
+	std::string root = resolveRoot(serverConfig, location);
+	std::string index = resolveIndex(serverConfig, location);
 	std::string filePath;
 	if (request.path == "/")
 		filePath = root + "/" + index;
 	else
 		filePath = root + request.path;
-	// 4. Read file
 	std::string content;
 	if (!getSource(filePath, content))
-	{
-		response.statusCode = 404;
-		response.reasonPhrase = "Not Found";
-		response.body = "Not Found";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] =
-			std::to_string(response.body.size());
-		return response;
-	}
-	// 5. Happy response
+		return buildErrorResponse(404, serverConfig);
 	response.statusCode = 200;
 	response.reasonPhrase = "OK";
 	response.body = content;
 	response.headers["Content-Type"] = "text/html";
-	response.headers["Content-Length"] =
-		std::to_string(response.body.size());
+	response.headers["Content-Length"] = std::to_string(response.body.size());
 	return response;
+}
+
+std::string ResponseBuilder::getReasonPhrase(int statusCode)
+{
+	if (statusCode == 400)
+		return "Bad Request";
+	if (statusCode == 404)
+		return "Not Found";
+	if (statusCode == 405)
+		return "Method Not Allowed";
+	if (statusCode == 413)
+		return "Payload Too Large";
+	if (statusCode == 500)
+		return "Internal Server Error";
+	if (statusCode == 501)
+		return "Not Implemented";
+	if (statusCode == 505)
+		return "HTTP Version Not Supported";
+
+	return "Internal Server Error";
 }
 
 Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig& serverConfig)
@@ -152,28 +139,17 @@ Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig&
 
 	response.version = "HTTP/1.1";
 	response.statusCode = statusCode;
+	response.reasonPhrase = getReasonPhrase(statusCode);
 
-	if (statusCode == 400)
-		response.reasonPhrase = "Bad Request";
-	else if (statusCode == 404)
-		response.reasonPhrase = "Not Found";
-	else if (statusCode == 405)
-		response.reasonPhrase = "Method Not Allowed";
-	else if (statusCode == 413)
-		response.reasonPhrase = "Payload Too Large";
-	else if (statusCode == 501)
-		response.reasonPhrase = "Not Implemented";
-	else if (statusCode == 505)
-		response.reasonPhrase = "HTTP Version Not Supported";
-	else
+	std::string errorPath =	serverConfig.root + "/" + serverConfig.error_page;
+	if (!getSource(errorPath, response.body))
 	{
-		response.statusCode = 500;
-		response.reasonPhrase = "Internal Server Error";
-	}
-	std::string path = serverConfig.root + "/" + serverConfig.error_page;
-	if (!getSource(path, response.body))
-	{
-		response.body = "<html><body><h1>Error</h1></body></html>";
+		response.body =
+			"<html><body><h1>"
+			+ std::to_string(response.statusCode)
+			+ " "
+			+ response.reasonPhrase
+			+ "</h1></body></html>";
 	}
 	response.headers["Content-Type"] = "text/html";
 	response.headers["Content-Length"] = std::to_string(response.body.size());
@@ -182,19 +158,20 @@ Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig&
 Response ResponseBuilder::buildResponse(const Request& request, const ServerConfig& serverConfig)
 {
 
-	//if(request.method == "GET")
-	//{
-		return (buildGetResponse(request, serverConfig));
-	//}
-	// else if(request.method == "POST")
-	// {
+	const LocationConfig* location = findLocation(request.path, serverConfig);
 
-	// }
-	// else if(request.method == "DELETE")
-	// {
+	if (location == NULL)
+		return buildErrorResponse(404, serverConfig);
+	if (!isMethodAllowed(request.method, *location))
+		return buildErrorResponse(405, serverConfig);
+	if (request.method == "GET")
+		return buildGetResponse(request, serverConfig, *location);
 
-	// }
+	// if (request.method == "POST")
+	//     return buildPostResponse;
 
-	//return (buildErrorResponse(static_cast<int>(request.httpStatus)), serverConfig);
+	// if (request.method == "DELETE")
+	//     return buildDeleteResponse;
+	return buildErrorResponse(501, serverConfig);
 }
 
