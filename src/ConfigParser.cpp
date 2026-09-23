@@ -69,6 +69,33 @@ bool ConfigParser::isValidPort(const std::string& token)
 		return false;
 	return true;
 }
+size_t ConfigParser::extract_size(const std::string& token)
+{
+	if(token.empty())
+		throw std::runtime_error("Invalid client_max_body_size");
+	size_t multiplier = 1;
+	char suffix = token[token.size() - 1]; // client_max_body_size 10m -> suffix is m
+	std::string number = token;
+	if (suffix == 'k' || suffix == 'K')
+	{
+		multiplier = 1024;
+		number = token.substr(0, token.size() - 1);
+	}
+	else if (suffix == 'm' || suffix == 'M')
+	{
+		multiplier = 1024 * 1024;
+		number = token.substr(0, token.size() - 1);
+	}
+	if (number.empty())
+		throw std::runtime_error("Invalid client_max_body_size");
+	for (size_t i = 0; i < number.size(); ++i)
+	{
+		if (!std::isdigit(static_cast<unsigned char>(number[i])))
+			throw std::runtime_error("Invalid client_max_body_size");
+	}
+	size_t size = static_cast<size_t>(std::stoull(number));
+	return size * multiplier;
+}
 LocationConfig ConfigParser::parseLocation()
 {
 	LocationConfig lc;
@@ -167,10 +194,10 @@ ServerConfig ConfigParser::parseServer()
 			_current++;
 			if (_current >= _tokens.size())
 				throw std::runtime_error("Missing Max body size");
-			sc.client_max_body_size = _tokens[_current];
+			sc.client_max_body_size = extract_size(_tokens[_current]);
 			_current++;
 			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after root");
+				throw std::runtime_error("Expected ';' after Max body size");
 			_current++;
 		}
 		else if (_tokens[_current] == "error_page")
@@ -181,7 +208,7 @@ ServerConfig ConfigParser::parseServer()
 			sc.error_page = _tokens[_current];
 			_current++;
 			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after root");
+				throw std::runtime_error("Expected ';' after error_page");
 			_current++;
 		}
 		else if (_tokens[_current] == "location")

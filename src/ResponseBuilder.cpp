@@ -170,7 +170,7 @@ Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig&
 		response.statusCode = 500;
 		response.reasonPhrase = "Internal Server Error";
 	}
-	std::string path = serverConfig.root + "/" + serverConfig.errorPage;
+	std::string path = serverConfig.root + "/" + serverConfig.error_page;
 	if (!getSource(path, response.body))
 	{
 		response.body = "<html><body><h1>Error</h1></body></html>";
