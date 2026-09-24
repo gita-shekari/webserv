@@ -103,10 +103,13 @@ void	Server::runningLoop(void)
 							+ std::to_string(fd) + " has no Client");
 						throw ServerException();
 					}
-					if (!receiveClientData(fd, it))//it-?second get config index -> _config[]
+					// TODO: temperate value for location index. later use location config index
+					const size_t locationIdx = it->second.getLocationIndex(); 
+					if (!receiveClientData(fd, it)) // _config[it->second.getConfigIndex()]
 						continue;
 					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
-					it->second.prepareResponse(_config[it->second.getConfigIndex()]);
+					it->second.routing(_config[it->second.getConfigIndex()]);
+					
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
 				}

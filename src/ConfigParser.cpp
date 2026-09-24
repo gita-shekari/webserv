@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <cctype>
+#include <limits>
 
 ConfigParser::ConfigParser(){}
 

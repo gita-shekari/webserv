@@ -13,17 +13,24 @@ struct LocationConfig
 	std::string path;
 	std::vector<std::string> methods;
 	std::string root;
+	size_t 		client_max_body_size; 
+	bool 		has_client_max_body_size;
+
 	std::string index;
+	bool 		autoindex = false;
 	std::string upload_store;
- 	size_t client_max_body_size;
- 	bool has_client_max_body_size;
+	std::map<std::string, std::string> cgiHandlers;
+	bool 		redirectEnabled = false;
+	int 		redirectStatus = 0;
+	std::string redirectTarget;
 };
 
 struct ServerConfig
 {
 	int port = 0;
 	std::string root;
-	size_t client_max_body_size;
-	std::map<int, std::string>	error_pages;
-	std::vector<LocationConfig>	locations;
+	std::string index;
+	std::string error_page = DEFAULT_ERROR_PAGE;
+	size_t		client_max_body_size = DEFAULT_BODY_SIZE; // initialize in case config file don't provide this
+	std::vector<LocationConfig> locations;
 };
