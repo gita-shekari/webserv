@@ -20,7 +20,7 @@ class ResponseBuilder
 		//based on  method response builders
 		Response buildGetResponse(const Request& request, const ServerConfig& serverConfig, const LocationConfig& location);
 
-		// Response buildPostResponse;
+		Response buildPostResponse(const Request& request, const ServerConfig& serverConfig, const LocationConfig& location);
 		// Response buildDeleteResponse;
 
 		// Config / routing helpers

@@ -112,7 +112,27 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 	response.headers["Content-Length"] = std::to_string(response.body.size());
 	return response;
 }
-
+Response ResponseBuilder::buildPostResponse(const Request& request, const ServerConfig& serverConfig, const LocationConfig& location)
+{
+	// if(location.path = "/upload")
+	std::string filePath = location.root + "/file"; // this path I need to process it
+	std::ofstream file(filePath.c_str(), std::ios::out | std::ios::binary);
+	if (!file.is_open())
+		return buildErrorResponse(500, serverConfig);
+	file.write(request.body.c_str(), request.body.size());
+	if (!file.good())
+		return buildErrorResponse(500, serverConfig);
+	file.close();
+	//creating response based on the extracted infos
+	Response response;
+	response.version = "HTTP/1.1";
+	response.statusCode = 201;
+	response.reasonPhrase = "Created";
+	response.body = "File uploaded";
+	response.headers["Content-Type"] = "text/plain";
+	response.headers["Content-Length"] = std::to_string(response.body.size());
+	return response;
+}
 std::string ResponseBuilder::getReasonPhrase(int statusCode)
 {
 	if (statusCode == 400)
@@ -167,8 +187,8 @@ Response ResponseBuilder::buildResponse(const Request& request, const ServerConf
 	if (request.method == "GET")
 		return buildGetResponse(request, serverConfig, *location);
 
-	// if (request.method == "POST")
-	//     return buildPostResponse;
+	if (request.method == "POST")
+		return buildPostResponse(request, serverConfig, *location);
 
 	// if (request.method == "DELETE")
 	//     return buildDeleteResponse;
