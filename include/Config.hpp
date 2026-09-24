@@ -3,6 +3,8 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <map>
+
 struct LocationConfig
 {
 	std::string					path;
