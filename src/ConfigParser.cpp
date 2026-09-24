@@ -154,62 +154,55 @@ LocationConfig ConfigParser::parseLocation()
 	_current++;
 	return lc;
 }
+void ConfigParser::expect(const std::string str)
+{
+	if(_tokens[_current] != str)
+		throw std::runtime_error("expected " + str );
+	_current++;
+}
+void ConfigParser::parseListen()
+{
+	_current++;
+	if (_current >= _tokens.size())
+		throw std::runtime_error("Missing port after listen");
+	if (!isValidPort(_tokens[_current]))
+		throw std::runtime_error("Invalid port");
+	sc.port = std::atoi(_tokens[_current].c_str());
+	_current++;
+	if (_current >= _tokens.size() || _tokens[_current] != ";")
+		throw std::runtime_error("Expected ';' after listen");
+	_current++;
+}
 ServerConfig ConfigParser::parseServer()
 {
 	ServerConfig sc;
 	// current token is "server"
 	//opening {
+	expect("server")
+	expect("{");
 	_current++;
 	if (_current >= _tokens.size() || _tokens[_current] != "{")
 		throw std::runtime_error("Expected '{' after server");
 	_current++;
+
 	while (_current < _tokens.size() && _tokens[_current] != "}")
 	{
+
 		if (_tokens[_current] == "listen")
 		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Missing port after listen");
-			if (!isValidPort(_tokens[_current]))
-				throw std::runtime_error("Invalid port");
-			sc.port = std::atoi(_tokens[_current].c_str());
-			_current++;
-			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after listen");
-			_current++;
+			ParseListen();
 		}
 		else if (_tokens[_current] == "root")
 		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Missing root path");
-			sc.root = _tokens[_current];
-			_current++;
-			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after root");
-			_current++;
+			parseRoot();
 		}
 		else if (_tokens[_current] == "client_max_body_size")
 		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Missing Max body size");
-			sc.client_max_body_size = extract_size(_tokens[_current]);
-			_current++;
-			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after Max body size");
-			_current++;
+			parseClientMaxBodySize();
 		}
 		else if (_tokens[_current] == "error_page")
 		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Missing error_page");
-			sc.error_page = _tokens[_current];
-			_current++;
-			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after error_page");
-			_current++;
+			
 		}
 		else if (_tokens[_current] == "location")
 			sc.locations.push_back(parseLocation());
@@ -234,7 +227,7 @@ ServerConfig ConfigParser::parseServer()
 		std::cout << std::endl;
 	return sc;
 }
-std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
+std::vector<ServerConfig> ConfigParser::parseConfig(const std::string& filename)
 {
 	std::ifstream conf(filename.c_str());
 	if (!conf.is_open())
@@ -243,7 +236,7 @@ std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
 	_tokens.clear();
 	tokenize(conf);
 	std::vector<ServerConfig> configs;
-	while(_current < _tokens.size())
+	while (_current < _tokens.size())
 	{
 		if (_tokens[_current] != "server")
 			throw std::runtime_error("Expected server block");
