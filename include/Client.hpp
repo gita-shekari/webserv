@@ -36,7 +36,7 @@ class Client
 
 	private:
 		int				_fd = -1;
-		size_t			_configIndex = 0;
+		size_t			_configIndex = 0; server config index / location config index
 		bool			_isConnected = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;

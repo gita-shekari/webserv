@@ -39,6 +39,7 @@ class Server
 		bool	setNonBlocking(int fd);
 
 		// for listen fd
+		void	validateUniquePorts(void) const;
 		void	setListeningSockets(void);
 		int		createListeningSocket(const ServerConfig& config);
 		bool	isListeningFd(int fd) const;

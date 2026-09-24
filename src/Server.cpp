@@ -103,7 +103,7 @@ void	Server::runningLoop(void)
 							+ std::to_string(fd) + " has no Client");
 						throw ServerException();
 					}
-					if (!receiveClientData(fd, it))
+					if (!receiveClientData(fd, it))//it-?second get config index -> _config[]
 						continue;
 					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
 					it->second.prepareResponse(_config[it->second.getConfigIndex()]);
@@ -238,6 +238,18 @@ bool	Server::setNonBlocking(int fd)
 		return false;
 	}
 	return true;
+}
+
+void	Server::validateUniquePorts(void) const
+{
+	for (size_t i = 0; i < _config.size(); ++i)
+	{
+		for (size_t j = i + 1; j < _config.size(); ++j)
+		{
+			if (_config[i].port == _config[j].port)
+				throw ServerException();
+		}
+	}
 }
 
 void	Server::setListeningSockets(void)
