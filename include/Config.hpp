@@ -9,7 +9,7 @@ struct LocationConfig
 	std::vector<std::string>	methods;
 	std::string					root;
 	std::string					index;
-	std::string					upload_store;
+	std::string					upload_path;
 	size_t						client_max_body_size;
 	bool						has_client_max_body_size;
 };
