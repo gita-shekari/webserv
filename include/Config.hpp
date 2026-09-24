@@ -3,21 +3,22 @@
 #include <string>
 #include <iostream>
 #include <vector>
-
 struct LocationConfig
 {
-	std::string path;
-	std::vector<std::string> methods;
-	std::string root;
-	std::string index;
+	std::string					path;
+	std::vector<std::string>	methods;
+	std::string					root;
+	std::string					index;
+	std::string					upload_store;
+	size_t						client_max_body_size;
+	bool						has_client_max_body_size;
 };
 
 struct ServerConfig
 {
-	int port = 0;
-	std::string root;
-	std::string index;
-	std::string error_page;
-	size_t		client_max_body_size = 1024 * 1024; // initialize in case config file don't provide this
-	std::vector<LocationConfig> locations;
+	int							port;
+	std::string					root;
+	size_t						client_max_body_size;
+	std::map<int, std::string>	error_pages;
+	std::vector<LocationConfig>	locations;
 };
