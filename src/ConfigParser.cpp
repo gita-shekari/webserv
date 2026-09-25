@@ -116,61 +116,47 @@ size_t ConfigParser::extract_size(const std::string& token)
 	size_t size = static_cast<size_t>(std::stoull(number));
 	return size * multiplier;
 }
+void ConfigParser::parseClientMaxBodySize(ServerConfig& sc)
+{
+	
+}
 LocationConfig ConfigParser::parseLocation()
 {
 	LocationConfig lc;
-	_current++;
-	if (_current >= _tokens.size())
-		throw std::runtime_error("Missing path after location");
-	lc.path = _tokens[_current];
-	_current++;
-	if (_current >= _tokens.size() || _tokens[_current] != "{")
-		throw std::runtime_error("Expected '{' after location");
-	_current++;
+	expect("location");
+
+	if (_current >= _tokens.size() || _tokens[_current] == "{")
+		throw std::runtime_error("Missing location path");
+	lc.path = _tokens[_current++];
+	expect("{");
 	while (_current < _tokens.size() && _tokens[_current] != "}")
 	{
 		if (_tokens[_current] == "methods")
-		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Expected method name");
-			while (_current < _tokens.size() && _tokens[_current] != ";")
-			{
-				lc.methods.push_back(_tokens[_current]);
-				_current++;
-			}
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Expected ';' after methods");
-			_current++;
-		}
+			parseMethods(lc);
 		else if (_tokens[_current] == "root")
-		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Expected root path");
-			lc.root = _tokens[_current];
-			_current++;
-			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after root");
-			_current++;
-		}
+			parseRoot(lc.root);
 		else if (_tokens[_current] == "index")
-		{
-			_current++;
-			if (_current >= _tokens.size())
-				throw std::runtime_error("Expected index file");
-			lc.index = _tokens[_current];
-			_current++;
-			if (_current >= _tokens.size() || _tokens[_current] != ";")
-				throw std::runtime_error("Expected ';' after index");
-			_current++;
-		}
+			parseIndex(lc);
+		else if (_tokens[_current] == "autoindex")
+			parseAutoindex(lc);
+		else if (_tokens[_current] == "client_max_body_size")
+			parseClientMaxBodySize(lc);
+		else if (_tokens[_current] == "upload")
+			parseUpload(lc);
+		else if (_tokens[_current] == "upload_store")
+			parseUploadStore(lc);
+		else if (_tokens[_current] == "return")
+			parseRedirect(lc);
+		else if (_tokens[_current] == "cgi_extension")
+			parseCgiExtension(lc);
+		else if (_tokens[_current] == "cgi_path")
+			parseCgiPath(lc);
 		else
-			throw std::runtime_error("Unknown location directive: " + _tokens[_current]);
+			throw std::runtime_error(
+				"Unknown location directive: " + _tokens[_current]);
 	}
-	if (_current >= _tokens.size())
-		throw std::runtime_error("Missing '}' for location block");
-	_current++;
+	expect("}");
+	validateLocation(lc);
 	return lc;
 }
 void ConfigParser::expect(const std::string& expected)
@@ -183,31 +169,56 @@ void ConfigParser::expect(const std::string& expected)
 }
 void ConfigParser::parseListen(ServerConfig& sc)
 {
-	expect("Listen");
+	expect("listen");
+	if (_current >= _tokens.size())
+		throw std::runtime_error("Missing listen value");
 	if (!isValidPort(_tokens[_current]))
-		throw std::runtime_error("Invalid port");
+		throw std::runtime_error("Invalid port: " + _tokens[_current]);
 	sc.port = std::atoi(_tokens[_current].c_str());
 	_current++;
 	expect(";");
 }
 void ConfigParser::parseHost(ServerConfig& sc)
 {
-	expect("Host");
+	expect("host");
+	if (_current >= _tokens.size())
+		throw std::runtime_error("Missing host value");
+	if (!isValidHost(_tokens[_current]))
+		throw std::runtime_error("Invalid host: " + _tokens[_current]);
+	sc.host = _tokens[_current];
+	_current++;
+	expect(";");
+}
+void ConfigParser::parseRoot(std::string& root)
+{
+	expect("root");
+	if (_current >= _tokens.size() ||
+		_tokens[_current] == ";" ||
+		_tokens[_current] == "}")
+		throw std::runtime_error("Missing root path");
+	root = _tokens[_current];
+	_current++;
+	expect(";");
+}
+void ConfigParser::parseRoot(std::string& root)
+{
+	expect("root");
 	if (!isValidHost(_tokens[_current]))
 		throw std::runtime_error("Invalid host");
 	sc.port = std::atoi(_tokens[_current].c_str());
 	_current++;
 	expect(";");
 }
-
 ServerConfig ConfigParser::parseServer()
 {
 	ServerConfig sc;
-	expect("server")
+	expect("server");
 	expect("{");
 	 while (_current < _tokens.size() && _tokens[_current] != "}")
 	{
-		if (_tokens[_current] == "listen")
+		if (_tokens[_current] == "host")
+			parseHost(sc);
+		else if (_tokens[_current] == "listen")
 			parseListen(sc);
 		else if (_tokens[_current] == "root")
 			parseRoot(sc.root);
