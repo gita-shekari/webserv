@@ -1,20 +1,6 @@
 #include "ConfigParser.hpp"
 
-
-// struct ServerConfig
-// {
-// 	int port;
-// 	std::string 				root;
-// 	std::string					index;
-// 	std::string					error_page
-// 	size_t 						clientMaxBodySize;
-// 	std::vector<LocationConfig> locations;
-// };
-
-ConfigParser::ConfigParser()
-{
-
-}
+ConfigParser::ConfigParser(){}
 void ConfigParser::tokenize(std::ifstream& file)
 {
 	std::string line;
@@ -69,6 +55,40 @@ bool ConfigParser::isValidPort(const std::string& token)
 		return false;
 	return true;
 }
+bool ConfigParser::isValidHost(const std::string& token)
+{
+	if (token.empty())
+		return false;
+	size_t i = 0;
+	for (size_t section = 0; section < 4; section++)
+	{
+		if (i >= token.size())
+			return false;
+		int value = 0;
+		size_t digits = 0;
+		while (i < token.size() && token[i] != '.')
+		{
+			if (!std::isdigit(static_cast<unsigned char>(token[i])))
+				return false;
+			value = value * 10 + (token[i] - '0');
+			digits++;
+			if (digits > 3 || value > 255)
+				return false;
+			i++;
+		}
+		if (digits == 0)
+			return false;
+		if (section < 3)
+		{
+			if (i >= token.size() || token[i] != '.')
+				return false;
+			i++;
+		}
+		else if (i != token.size())
+			return false;
+	}
+	return true;
+}
 size_t ConfigParser::extract_size(const std::string& token)
 {
 	if(token.empty())
@@ -99,7 +119,6 @@ size_t ConfigParser::extract_size(const std::string& token)
 LocationConfig ConfigParser::parseLocation()
 {
 	LocationConfig lc;
-	// current token is "location"
 	_current++;
 	if (_current >= _tokens.size())
 		throw std::runtime_error("Missing path after location");
@@ -154,64 +173,55 @@ LocationConfig ConfigParser::parseLocation()
 	_current++;
 	return lc;
 }
-void ConfigParser::expect(const std::string str)
+void ConfigParser::expect(const std::string& expected)
 {
-	if(_tokens[_current] != str)
-		throw std::runtime_error("expected " + str );
+	 if (_current >= _tokens.size())
+		throw std::runtime_error("Unexpected end of config");
+	if (_tokens[_current] != expected)
+		throw std::runtime_error("Unexpected token");
 	_current++;
 }
-void ConfigParser::parseListen()
+void ConfigParser::parseListen(ServerConfig& sc)
 {
-	_current++;
-	if (_current >= _tokens.size())
-		throw std::runtime_error("Missing port after listen");
+	expect("Listen");
 	if (!isValidPort(_tokens[_current]))
 		throw std::runtime_error("Invalid port");
 	sc.port = std::atoi(_tokens[_current].c_str());
 	_current++;
-	if (_current >= _tokens.size() || _tokens[_current] != ";")
-		throw std::runtime_error("Expected ';' after listen");
-	_current++;
+	expect(";");
 }
+void ConfigParser::parseHost(ServerConfig& sc)
+{
+	expect("Host");
+	if (!isValidHost(_tokens[_current]))
+		throw std::runtime_error("Invalid host");
+	sc.port = std::atoi(_tokens[_current].c_str());
+	_current++;
+	expect(";");
+}
+
 ServerConfig ConfigParser::parseServer()
 {
 	ServerConfig sc;
-	// current token is "server"
-	//opening {
 	expect("server")
 	expect("{");
-	_current++;
-	if (_current >= _tokens.size() || _tokens[_current] != "{")
-		throw std::runtime_error("Expected '{' after server");
-	_current++;
-
-	while (_current < _tokens.size() && _tokens[_current] != "}")
+	 while (_current < _tokens.size() && _tokens[_current] != "}")
 	{
-
 		if (_tokens[_current] == "listen")
-		{
-			ParseListen();
-		}
+			parseListen(sc);
 		else if (_tokens[_current] == "root")
-		{
-			parseRoot();
-		}
+			parseRoot(sc.root);
 		else if (_tokens[_current] == "client_max_body_size")
-		{
-			parseClientMaxBodySize();
-		}
+			parseClientMaxBodySize(sc);
 		else if (_tokens[_current] == "error_page")
-		{
-			
-		}
+			parseErrorPage(sc);
 		else if (_tokens[_current] == "location")
 			sc.locations.push_back(parseLocation());
 		else
 			throw std::runtime_error("Unknown server config: " + _tokens[_current]);
 	}
-	if (_current >= _tokens.size())
-		throw std::runtime_error("Missing '}' for server block");
-	_current++;
+	expect("}");
+	validateServer(sc);
 	std::cout
 		<< "port="
 		<< sc.port

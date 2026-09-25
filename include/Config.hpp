@@ -7,41 +7,35 @@
 
 struct LocationConfig
 {
-	// Route
-	std::string					path;
+	std::string path;
+	std::vector<std::string> methods;
 
-	// Access
-	std::vector<std::string>	methods;
+	std::string root;
+	std::string index;
+	bool autoindex = false;
 
-	// Static files
-	std::string					root;
-	std::string					index;
-	bool						autoindex;
+	size_t client_max_body_size = 0;
+	bool has_client_max_body_size = false;
 
-	// Request limits
-	size_t						client_max_body_size;
-	bool						has_client_max_body_size;
+	bool upload_enabled = false;
+	std::string upload_store;
 
-	// Upload
-	bool						upload_enabled;
-	std::string					upload_store;
+	bool has_redirect = false;
+	int redirect_code = 0;
+	std::string redirect_target;
 
-	// Redirect
-	bool						has_redirect;
-	int							redirect_code;
-	std::string					redirect_target;
-
-	// CGI
-	std::string					cgi_extension;
-	std::string					cgi_path;
+	std::string cgi_extension;
+	std::string cgi_path;
 };
 
 struct ServerConfig
 {
-	std::string					host;
-	int							port;
-	std::string					root;
-	size_t						client_max_body_size;
-	std::map<int, std::string>	error_pages;
-	std::vector<LocationConfig>	locations;
+	std::string host = "0.0.0.0";
+	int port = 0;
+
+	std::string root;
+	size_t client_max_body_size = 1024 * 1024;
+
+	std::map<int, std::string> error_pages;
+	std::vector<LocationConfig> locations;
 };
