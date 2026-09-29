@@ -78,25 +78,25 @@ bool ResponseBuilder::isMethodAllowed(const std::string& method, const LocationC
 	}
 	return false;
 }
-std::string ResponseBuilder::resolveRoot(const ServerConfig& serverConfig, const LocationConfig& location)
+std::string ResponseBuilder::getRoot(const ServerConfig& serverConfig, const LocationConfig& location)
 {
 	if (!location.root.empty())
 		return location.root;
 	return serverConfig.root;
 }
-std::string ResponseBuilder::resolveIndex(const ServerConfig& serverConfig, const LocationConfig& location)
+std::string ResponseBuilder::getIndex(const LocationConfig& location)
 {
 	if (!location.index.empty())
 		return location.index;
-	return serverConfig.index;
+	return "index.html";
 }
 Response ResponseBuilder::buildGetResponse(const Request& request, const ServerConfig& serverConfig, const LocationConfig& location)
 {
 	Response response;
 	response.version = "HTTP/1.1";
 
-	std::string root = resolveRoot(serverConfig, location);
-	std::string index = resolveIndex(serverConfig, location);
+	std::string root = getRoot(serverConfig, location);
+	std::string index = getIndex(location);
 	std::string filePath;
 	if (request.path == "/")
 		filePath = root + "/" + index;
@@ -156,21 +156,21 @@ std::string ResponseBuilder::getReasonPhrase(int statusCode)
 Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig& serverConfig)
 {
 	Response response;
-
+	(void)serverConfig;
 	response.version = "HTTP/1.1";
 	response.statusCode = statusCode;
 	response.reasonPhrase = getReasonPhrase(statusCode);
-
-	std::string errorPath =	serverConfig.root + "/" + serverConfig.error_page;
-	if (!getSource(errorPath, response.body))
-	{
+	// need to chnage this part, each error has its own error_page
+	///std::string errorPath =	serverConfig.root + "/" + serverConfig.error_pages;
+	// if (!getSource(errorPath, response.body))
+	// {
 		response.body =
 			"<html><body><h1>"
 			+ std::to_string(response.statusCode)
 			+ " "
 			+ response.reasonPhrase
 			+ "</h1></body></html>";
-	}
+	// }
 	response.headers["Content-Type"] = "text/html";
 	response.headers["Content-Length"] = std::to_string(response.body.size());
 	return response;

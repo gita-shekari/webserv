@@ -116,49 +116,6 @@ size_t ConfigParser::extract_size(const std::string& token)
 	size_t size = static_cast<size_t>(std::stoull(number));
 	return size * multiplier;
 }
-void ConfigParser::parseClientMaxBodySize(ServerConfig& sc)
-{
-	
-}
-LocationConfig ConfigParser::parseLocation()
-{
-	LocationConfig lc;
-	expect("location");
-
-	if (_current >= _tokens.size() || _tokens[_current] == "{")
-		throw std::runtime_error("Missing location path");
-	lc.path = _tokens[_current++];
-	expect("{");
-	while (_current < _tokens.size() && _tokens[_current] != "}")
-	{
-		if (_tokens[_current] == "methods")
-			parseMethods(lc);
-		else if (_tokens[_current] == "root")
-			parseRoot(lc.root);
-		else if (_tokens[_current] == "index")
-			parseIndex(lc);
-		else if (_tokens[_current] == "autoindex")
-			parseAutoindex(lc);
-		else if (_tokens[_current] == "client_max_body_size")
-			parseClientMaxBodySize(lc);
-		else if (_tokens[_current] == "upload")
-			parseUpload(lc);
-		else if (_tokens[_current] == "upload_store")
-			parseUploadStore(lc);
-		else if (_tokens[_current] == "return")
-			parseRedirect(lc);
-		else if (_tokens[_current] == "cgi_extension")
-			parseCgiExtension(lc);
-		else if (_tokens[_current] == "cgi_path")
-			parseCgiPath(lc);
-		else
-			throw std::runtime_error(
-				"Unknown location directive: " + _tokens[_current]);
-	}
-	expect("}");
-	validateLocation(lc);
-	return lc;
-}
 void ConfigParser::expect(const std::string& expected)
 {
 	 if (_current >= _tokens.size())
@@ -167,6 +124,55 @@ void ConfigParser::expect(const std::string& expected)
 		throw std::runtime_error("Unexpected token");
 	_current++;
 }
+void ConfigParser::parseClientMaxBodySize(ServerConfig& sc)
+{
+	expect("client_max_body_size");
+	if (_current >= _tokens.size())
+		throw std::runtime_error("Unexpected end of config");
+	sc.client_max_body_size = extract_size(_tokens[_current]);
+	_current++;
+	expect(";");
+}
+LocationConfig ConfigParser::parseLocation()
+{
+	LocationConfig lc;
+	expect("location");
+
+	// if (_current >= _tokens.size() || _tokens[_current] == "{")
+	// 	throw std::runtime_error("Missing location path");
+	// lc.path = _tokens[_current++];
+	// expect("{");
+	// while (_current < _tokens.size() && _tokens[_current] != "}")
+	// {
+	// 	if (_tokens[_current] == "methods")
+	// 		parseMethods(lc);
+	// 	else if (_tokens[_current] == "root")
+	// 		parseRoot(lc.root);
+	// 	else if (_tokens[_current] == "index")
+	// 		parseIndex(lc);
+	// 	else if (_tokens[_current] == "autoindex")
+	// 		parseAutoindex(lc);
+	// 	else if (_tokens[_current] == "client_max_body_size")
+	// 		parseClientMaxBodySize(lc);
+	// 	else if (_tokens[_current] == "upload")
+	// 		parseUpload(lc);
+	// 	else if (_tokens[_current] == "upload_store")
+	// 		parseUploadStore(lc);
+	// 	else if (_tokens[_current] == "return")
+	// 		parseRedirect(lc);
+	// 	else if (_tokens[_current] == "cgi_extension")
+	// 		parseCgiExtension(lc);
+	// 	else if (_tokens[_current] == "cgi_path")
+	// 		parseCgiPath(lc);
+	// 	else
+	// 		throw std::runtime_error(
+	// 			"Unknown location directive: " + _tokens[_current]);
+	// }
+	// expect("}");
+	// validateLocation(lc);
+	return lc;
+}
+
 void ConfigParser::parseListen(ServerConfig& sc)
 {
 	expect("listen");
@@ -192,20 +198,9 @@ void ConfigParser::parseHost(ServerConfig& sc)
 void ConfigParser::parseRoot(std::string& root)
 {
 	expect("root");
-	if (_current >= _tokens.size() ||
-		_tokens[_current] == ";" ||
-		_tokens[_current] == "}")
+	if (_current >= _tokens.size())
 		throw std::runtime_error("Missing root path");
 	root = _tokens[_current];
-	_current++;
-	expect(";");
-}
-void ConfigParser::parseRoot(std::string& root)
-{
-	expect("root");
-	if (!isValidHost(_tokens[_current]))
-		throw std::runtime_error("Invalid host");
-	sc.port = std::atoi(_tokens[_current].c_str());
 	_current++;
 	expect(";");
 }
@@ -224,24 +219,22 @@ ServerConfig ConfigParser::parseServer()
 			parseRoot(sc.root);
 		else if (_tokens[_current] == "client_max_body_size")
 			parseClientMaxBodySize(sc);
-		else if (_tokens[_current] == "error_page")
-			parseErrorPage(sc);
-		else if (_tokens[_current] == "location")
-			sc.locations.push_back(parseLocation());
+		// else if (_tokens[_current] == "error_page")
+		// 	parseErrorPage(sc);
+		// else if (_tokens[_current] == "location")
+		// 	sc.locations.push_back(parseLocation());
 		else
 			throw std::runtime_error("Unknown server config: " + _tokens[_current]);
 	}
 	expect("}");
-	validateServer(sc);
+	//validateServer(sc);
 	std::cout
 		<< "port="
 		<< sc.port
 		<< ", root="
 		<< sc.root
 		<< ", max="
-		<< sc.client_max_body_size
-		<< ", error_page="
-		<< sc.error_page;
+		<< sc.client_max_body_size;
 		std::cout << ", locations=";
 		for(size_t i = 0; i < sc.locations.size(); i++)
 			std::cout << sc.locations[i].path;

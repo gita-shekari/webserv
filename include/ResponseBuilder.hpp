@@ -28,8 +28,8 @@ class ResponseBuilder
 		bool isMethodAllowed(const std::string& method, const LocationConfig& location);
 
 		// File/path helpers
-		std::string resolveRoot(const ServerConfig& serverConfig, const LocationConfig& location);
-		std::string resolveIndex(const ServerConfig& serverConfig,const LocationConfig& location);
+		std::string getRoot(const ServerConfig& serverConfig, const LocationConfig& location);
+		std::string getIndex(const LocationConfig& location);
 		bool getSource(const std::string& path, std::string& content);
 		std::string getReasonPhrase(int statusCode);
 };

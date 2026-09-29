@@ -35,6 +35,7 @@ class ConfigParser
 		void						expect(const std::string& expected);
 		const std::string&			currentToken() const;
 		bool						isValidPort(const std::string& token);
+		bool						isValidHost(const std::string& token);
 		size_t 						extract_size(const std::string& token);
 	public:
 		ConfigParser();
