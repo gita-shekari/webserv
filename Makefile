@@ -11,6 +11,7 @@ SRC = \
 	src/RequestParser.cpp \
 	src/ResponseBuilder.cpp \
 	src/Server.cpp \
+	src/UriUtils.cpp \
 	src/main.cpp
 #	test_files/server_nonblocking.cpp
 

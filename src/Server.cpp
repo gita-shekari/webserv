@@ -243,18 +243,6 @@ bool	Server::setNonBlocking(int fd)
 	return true;
 }
 
-void	Server::validateUniquePorts(void) const
-{
-	for (size_t i = 0; i < _config.size(); ++i)
-	{
-		for (size_t j = i + 1; j < _config.size(); ++j)
-		{
-			if (_config[i].port == _config[j].port)
-				throw ServerException();
-		}
-	}
-}
-
 void	Server::setListeningSockets(void)
 {
 	for (size_t i = 0; i < _config.size(); ++i)
@@ -372,9 +360,10 @@ void	Server::acceptNewClient(int listenerFd)
 		Logger::fatal("acceptNewClient called with unknown listener fd");
 		throw ServerException();
 	}
-	// drain all pending connections
-	//TODO: Discuss: will it cause starvation if there are huge amount of client connections and keeps coming in new ones at the speed faster then our loop? static const size_t MAX_ACCEPT_PER_EVENT = 32 or 64
-	while (true)
+
+	size_t	acceptedCount = 0;
+
+	while (acceptedCount < MAX_ACCEPTS_PER_EVENT)
 	{
 		int clientFd = accept(listenerFd, NULL, NULL);
 		
@@ -413,6 +402,7 @@ void	Server::acceptNewClient(int listenerFd)
 		size_t	configIndex = listenerIt->second;
 		_clients[clientFd] = Client(clientFd, configIndex);
 
+		acceptedCount++;
 		Logger::debug("client connected: fd=" + std::to_string(clientFd));
 	}
 }

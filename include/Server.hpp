@@ -39,7 +39,6 @@ class Server
 		bool	setNonBlocking(int fd);
 
 		// for listen fd
-		void	validateUniquePorts(void) const;
 		void	setListeningSockets(void);
 		int		createListeningSocket(const ServerConfig& config);
 		bool	isListeningFd(int fd) const;
@@ -64,6 +63,8 @@ class Server
 	private:
 		static const int	CLIENT_TIMEOUT_SEC = 30;
 		static const int	POLL_TIMEOUT_MS = 1000;
+
+		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
 
 		bool										_isRunning;
 		const std::vector<struct ServerConfig>& 	_config;

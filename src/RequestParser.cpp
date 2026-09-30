@@ -1,4 +1,6 @@
 #include "RequestParser.hpp"
+#include "UriUtils.hpp"
+
 #include <iostream>
 #include <cctype>
 #include <limits>
@@ -105,14 +107,9 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 	if (req.version != "HTTP/1.1")
 		return error(req, HTTP_VERSION_NOT_NSUP);
 
-	size_t	qMark = req.rawTarget.find('?');
-	if (qMark == std::string::npos)
-		req.path = req.rawTarget;
-	else
-	{
-		req.path = req.rawTarget.substr(0, qMark);
-		req.query = req.rawTarget.substr(qMark + 1);
-	}
+	if (!UriUtils::handleRawTarget(req))
+		return error(req, BAD_REQ);
+
 	_cursor = lineEnd + 2;
 	_section = HEADERS;
 	return COMPLETE;

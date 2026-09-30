@@ -174,6 +174,15 @@ bool	parseMaxSize(size_t& size, std::string& input)
 	return true;
 }
 
+void	ConfigParser::validateUniquePorts(const std::vector<ServerConfig>& configs, int newPort)
+{
+	for (size_t i = 0; i < configs.size(); ++i)
+	{
+		if (configs[i].port == newPort)
+			throw std::runtime_error("Duplicate listen port: " + std::to_string(newPort));
+	}
+}
+
 ServerConfig ConfigParser::parseServer()
 {
 	ServerConfig sc;
@@ -183,16 +192,22 @@ ServerConfig ConfigParser::parseServer()
 	if (_current >= _tokens.size() || _tokens[_current] != "{")
 		throw std::runtime_error("Expected '{' after server");
 	_current++;
+
+	bool hasListen = false;
+
 	while (_current < _tokens.size() && _tokens[_current] != "}")
 	{
 		if (_tokens[_current] == "listen")
 		{
+			if (hasListen)
+				throw std::runtime_error("Duplicate listen directive in server block");
 			_current++;
 			if (_current >= _tokens.size())
 				throw std::runtime_error("Missing port after listen");
 			if (!isValidPort(_tokens[_current]))
 				throw std::runtime_error("Invalid port");
 			sc.port = std::atoi(_tokens[_current].c_str());
+			hasListen = true;
 			_current++;
 			if (_current >= _tokens.size() || _tokens[_current] != ";")
 				throw std::runtime_error("Expected ';' after listen");
@@ -268,7 +283,10 @@ std::vector<ServerConfig>	ConfigParser::parseConfig(const std::string& filename)
 	{
 		if (_tokens[_current] != "server")
 			throw std::runtime_error("Expected server block");
-		configs.push_back(parseServer());
+
+		ServerConfig newConfig = parseServer();
+		validateUniquePorts(configs, newConfig.port);
+		configs.push_back(newConfig);
 	}
 	return configs;
 }
