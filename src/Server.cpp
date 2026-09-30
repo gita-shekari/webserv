@@ -19,7 +19,6 @@ Server::Server(const std::vector<ServerConfig>& config)
 {
 	Logger::debug("server object created");
 }
-
 // Need server shutdown function.
 Server::~Server(void)
 {
@@ -62,7 +61,9 @@ void	Server::runningLoop(void)
 
 	while (_isRunning)
 	{
-		int res = poll(&_pollfds[0], _pollfds.size(), POLL_TIMEOUT_MS);
+		const size_t polledFdCount = _pollfds.size(); 
+		// because the size might change since accpet new fds push back in to _pollfds;
+		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
 
 		if (res == -1)
 		{
@@ -74,7 +75,8 @@ void	Server::runningLoop(void)
 
 		if (res > 0)
 		{
-			for (size_t i = 0; i < _pollfds.size(); i++)
+			
+			for (size_t i = 0; i < polledFdCount; i++)
 			{
 				short revents = _pollfds[i].revents;
 				int fd = _pollfds[i].fd;
@@ -101,9 +103,13 @@ void	Server::runningLoop(void)
 							+ std::to_string(fd) + " has no Client");
 						throw ServerException();
 					}
-					if (!receiveClientData(fd, it))
+					// TODO: temperate value for location index. later use location config index
+					const size_t locationIdx = it->second.getLocationIndex(); 
+					if (!receiveClientData(fd, it)) // _config[it->second.getConfigIndex()]
 						continue;
-					it->second.prepareResponse(_config[it->second.getConfigIndex()]);
+					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
+					it->second.routing(_config[it->second.getConfigIndex()]);
+					
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
 				}
@@ -113,6 +119,8 @@ void	Server::runningLoop(void)
 					if (sendClientData(fd))
 					{
 						_pollfds[i].events &= ~POLLOUT;
+						// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
+						// if request.headers contains "connection" and "close", mark fd close
 					}
 				}
 			}
@@ -235,6 +243,18 @@ bool	Server::setNonBlocking(int fd)
 	return true;
 }
 
+void	Server::validateUniquePorts(void) const
+{
+	for (size_t i = 0; i < _config.size(); ++i)
+	{
+		for (size_t j = i + 1; j < _config.size(); ++j)
+		{
+			if (_config[i].port == _config[j].port)
+				throw ServerException();
+		}
+	}
+}
+
 void	Server::setListeningSockets(void)
 {
 	for (size_t i = 0; i < _config.size(); ++i)
@@ -290,7 +310,6 @@ int		Server::createListeningSocket(const ServerConfig& config)
 	//config file contents goes here?
 	sockaddr_in serverAddress = {};
 	serverAddress.sin_family = AF_INET;
-	// port number need to be replaced according to config 
 	serverAddress.sin_port = htons(config.port);
 	serverAddress.sin_addr.s_addr = INADDR_ANY;
 
@@ -354,6 +373,7 @@ void	Server::acceptNewClient(int listenerFd)
 		throw ServerException();
 	}
 	// drain all pending connections
+	//TODO: Discuss: will it cause starvation if there are huge amount of client connections and keeps coming in new ones at the speed faster then our loop? static const size_t MAX_ACCEPT_PER_EVENT = 32 or 64
 	while (true)
 	{
 		int clientFd = accept(listenerFd, NULL, NULL);
@@ -414,7 +434,7 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		it->second.updateLastActivity();
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
-		ParseStatus status = it->second.parseRequest(buffer);
+		ParseStatus status = it->second.parseRequest(buffer, _config[it->second.getConfigIndex()]);
 		if (status == INCOMPLETE)
 			return false;
 		return true;
@@ -444,7 +464,6 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		}
 		return false;
 	}
-	return true; //?
 }
 
 void	Server::markForClose(int fd)

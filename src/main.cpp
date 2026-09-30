@@ -23,7 +23,9 @@ int main(int argc, char **argv)
 	try
 	{
 		ConfigParser parser;
+		// parseConfig need to adapt error_page
 		std::vector<ServerConfig> configs = parser.parseConfig(file);
+
 		Logger::info("configuration parsed successfully: " + file);
 		if (configs.empty())
 		{

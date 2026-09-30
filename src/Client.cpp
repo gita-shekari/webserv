@@ -24,6 +24,11 @@ size_t	Client::getConfigIndex(void) const
 	return _configIndex;
 }
 
+size_t	Client::getLocationIndex(void) const
+{
+	return _locationIndex;
+}
+
 bool	Client::getIsConnected(void)
 {
 	return _isConnected;
@@ -48,11 +53,11 @@ void	Client::disConnected(void)
 {
 	_isConnected = false;
 }
-ParseStatus	Client::parseRequest(char *buffer)
+ParseStatus	Client::parseRequest(char *buffer, const ServerConfig& serverConfig)
 {
 	_readBuffer.append(buffer);
 
-	ParseStatus status = _parser.parse(_readBuffer, _request);
+	ParseStatus status = _parser.parse(_readBuffer, _request, serverConfig.client_max_body_size);
 	if (status == COMPLETE)
 	{
 		_readBuffer.clear();
@@ -60,16 +65,38 @@ ParseStatus	Client::parseRequest(char *buffer)
 	return status;
 }
 
-void Client::prepareResponse(const ServerConfig& serverConfig)
+//enum	ConfigBehavior
+//{
+//	REDIRECT,
+//	CGI,
+//	UPLOAD,
+//	DELETE,
+//	DIRECTORU_LISTING,
+//	STATIC
+//};
+
+ConfigBehavior checkConfigBehavior(const ServerConfig& sc, const LocationConfig& lc, const Request& req)
 {
-	//status is not 0
+	std::string root = sc.root;
+	if (lc.root.size() != 0)
+		root = lc.root;
+	root + lc.path 
+	if (lc.cgiHandlers.size() != 0)
+}
+
+void Client::routing(const ServerConfig& serverConfig)
+{
 	if(_request.httpStatus != REQ_OK)
 	{
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus));
+		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
 	}
 	else
-		_response = _builder.buildResponse(_request, serverConfig);
-	_writeBuffer = _builder.serialize(_response);
+	{
+		ConfigBehavior action = checkConfigBehavior(serverConfig, serverConfig.locations[_locationIndex], _request);
+	}
+	//else
+	//	_response = _builder.buildResponse(_request, serverConfig);
+	//_writeBuffer = _builder.serialize(_response);
 }
 
 void	Client::updateLastActivity(void)

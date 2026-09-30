@@ -9,6 +9,17 @@
 # include <cstddef> //for size_t
 # include <chrono> // for steady_clock
 
+enum	ConfigBehavior
+{
+	REDIRECT,
+	CGI,
+	UPLOAD,
+	DELETE,
+	DIRECTORU_LISTING,
+	STATIC
+};
+
+
 class Client
 {
 	public:
@@ -19,6 +30,7 @@ class Client
 		//getters
 		int			getFd(void);
 		size_t		getConfigIndex(void) const;
+		size_t		getLocationIndex(void) const;
 		bool		getIsConnected(void);
 		std::string getWriteBuffer();
 		Request		getReq(void);
@@ -28,8 +40,8 @@ class Client
 		void		disConnected(void);
 
 		// for appending information in buffer
-		ParseStatus	parseRequest(char *buffer);
-		void 		prepareResponse(const ServerConfig& serverConfig);
+		ParseStatus	parseRequest(char *buffer, const ServerConfig& serverConfig);
+		void 		routing(const ServerConfig& serverConfig);
 
 		// for timer
 		void		updateLastActivity(void);
@@ -37,6 +49,7 @@ class Client
 	private:
 		int				_fd = -1;
 		size_t			_configIndex = 0;
+		size_t			_locationIndex = 0;
 		bool			_isConnected = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;

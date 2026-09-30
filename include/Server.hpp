@@ -1,13 +1,12 @@
 #pragma once
-# include "Client.hpp"
-# include "Config.hpp"
-# include "Logger.hpp"
 
+#include <string>
+#include <iostream>
 // error macro is here
 #include <fstream>
 
 // for socket;
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <sys/socket.h>
 
 // for poll
@@ -16,6 +15,10 @@
 // for containers
 #include <vector>
 #include <map>
+
+#include "Client.hpp"
+#include "Config.hpp"
+#include "Logger.hpp"
 
 class Server
 {
@@ -36,6 +39,7 @@ class Server
 		bool	setNonBlocking(int fd);
 
 		// for listen fd
+		void	validateUniquePorts(void) const;
 		void	setListeningSockets(void);
 		int		createListeningSocket(const ServerConfig& config);
 		bool	isListeningFd(int fd) const;

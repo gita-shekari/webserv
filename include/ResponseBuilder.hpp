@@ -13,7 +13,7 @@ class ResponseBuilder
 	public:
 		Response buildResponse(const Request& request, const ServerConfig& serverConfig);
 		Response buildGetResponse(const Request& request, const ServerConfig& serverConfig);
-		Response buildErrorResponse(int statusCode);
+		Response buildErrorResponse(int statusCode, const ServerConfig& serverConfig);
 		const LocationConfig* findLocation(const std::string& path, const ServerConfig& serverConfig);
 		std::string serialize(const Response& response);
 	private:

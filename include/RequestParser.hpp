@@ -34,7 +34,7 @@ class RequestParser
 {
 	public:
 		RequestParser();
-		ParseStatus	parse(const std::string& buffer, Request& req);
+		ParseStatus	parse(const std::string& buffer, Request& req, size_t maxBodySize);
 		size_t	getConsumedBytes() const;
 		void	reset();
 
@@ -52,17 +52,17 @@ class RequestParser
 		ParseStatus error(Request& req, HttpStatus status);
 		ParseStatus	parseRequestLine(const std::string& buffer, Request& req);
 		ParseStatus	parseHeaders(const std::string& buffer, Request& req);
-		ParseStatus	parseBody(const std::string& buffer, Request& req);
+		ParseStatus	parseBody(const std::string& buffer, Request& req, size_t maxBodySize);
 
 		ParseStatus	judgeBody(Request& req);
 
 		ParseStatus	parseContentLengthBody(const std::string& buffer, Request& req);
-		ParseStatus	parseChunkedBody(const std::string& buffer, Request& req);
+		ParseStatus	parseChunkedBody(const std::string& buffer, Request& req,  size_t maxBodySize);
 
 		//parse size
 		bool	parseDecSize(const std::string& str, size_t& size);
 		bool	parseHexSize(const std::string& str, size_t& size);
-	
+
 		//utils
 		std::string	toLower(const std::string& str);
 		std::string	trim(const std::string& str);

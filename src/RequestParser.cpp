@@ -5,7 +5,7 @@
 
 RequestParser::RequestParser(): _section(REQUEST_LINE), _cursor(0), _contentLength(0), _body(NO_BODY), _chunkState(CHUNK_SIZE), _chunkSize(0){}
 
-ParseStatus	RequestParser::parse(const std::string& buffer, Request& req)
+ParseStatus	RequestParser::parse(const std::string& buffer, Request& req, size_t maxBodySize)
 {
 	while (_section != DONE)
 	{
@@ -16,8 +16,8 @@ ParseStatus	RequestParser::parse(const std::string& buffer, Request& req)
 		else if (_section == HEADERS)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
-			status = parseBody(buffer, req);
-		else // how can _section == DONE 				
+			status = parseBody(buffer, req, maxBodySize);
+		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
 			return status;
@@ -87,7 +87,6 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 
 	if (lineEnd == std::string::npos)
 		return INCOMPLETE;
-	
 	std::string line = buffer.substr(_cursor, lineEnd - _cursor);
 
 	size_t	firstSpace = line.find(' ');
@@ -119,6 +118,7 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 	return COMPLETE;
 }
 
+//TODO:	content-length if exist, can check for client_max_body_size. add a layer to fiind host and find the server and location to check for client_max_body_size before doing body parsing.
 ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 {
 	size_t	headerEnd = buffer.find("\r\n\r\n", _cursor);
@@ -159,16 +159,16 @@ ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 	host = req.headers.find("host");
 	if (host == req.headers.end() || host->second.empty())
 		return error(req, BAD_REQ);
-	_cursor = headerEnd + 4;	
+	_cursor = headerEnd + 4;
 	return (judgeBody(req));
 }
 
-ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req)
+ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req, size_t maxBodySize)
 {
 	if (_body == CONTENT_LENGTH_BODY)
 		return parseContentLengthBody(buffer, req);
 	if (_body == CHUNKED_BODY)
-		return parseChunkedBody(buffer, req);
+		return parseChunkedBody(buffer, req, maxBodySize);
 	return ERROR;
 }
 
@@ -213,7 +213,7 @@ ParseStatus	RequestParser::parseContentLengthBody(const std::string& buffer, Req
 	return COMPLETE;
 }
 
-ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req)
+ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req, size_t maxBodySize)
 {
 	while (true)
 	{
@@ -253,9 +253,8 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				return INCOMPLETE;
 			if (buffer[_cursor + _chunkSize] != '\r' || buffer[_cursor + _chunkSize + 1] != '\n')
 				return error(req, BAD_REQ);
-			
-			// if (req.body.size() > config.maxBodySize || _chunkSize > config.maxBodySize - req.body.size())
-			// 		return error(req, PLAYLOAD_TOO_LARGE)
+			if (req.body.size() > maxBodySize || _chunkSize > maxBodySize - req.body.size())
+				return error(req, PLAYLOAD_TOO_LARGE);
 			req.body.append(buffer, _cursor, _chunkSize);
 			_cursor += _chunkSize + 2;
 			_chunkState = CHUNK_SIZE;
