@@ -65,6 +65,8 @@ class Server
 		static const int	CLIENT_TIMEOUT_SEC = 30;
 		static const int	POLL_TIMEOUT_MS = 1000;
 
+		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
+
 		bool										_isRunning;
 		const std::vector<struct ServerConfig>& 	_config;
 		std::vector<struct pollfd>					_pollfds;

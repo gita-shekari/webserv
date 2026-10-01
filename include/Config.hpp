@@ -4,6 +4,8 @@
 #include <iostream>
 #include <vector>
 
+#include <map>
+
 const size_t DEFAULT_BODY_SIZE = 1024 * 1024;
 const size_t ABS_MAX_CAP_BODY_SIZE = 100 * 1024 * 1024; // 100M safty; for client_max_size = 0M or too big size
 const std::string DEFAULT_ERROR_PAGE = "error.html";

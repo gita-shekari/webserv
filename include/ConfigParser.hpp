@@ -18,6 +18,9 @@ class ConfigParser
 		LocationConfig				parseLocation();
 		const std::string&			currentToken() const;
 		bool						isValidPort(const std::string& token);
+
+		void						validateUniquePorts(const std::vector<ServerConfig>& configs, int newPort);
+
 	public:
 		ConfigParser();
 		std::vector<ServerConfig>	parseConfig(const std::string& filename);

@@ -103,12 +103,10 @@ void	Server::runningLoop(void)
 							+ std::to_string(fd) + " has no Client");
 						throw ServerException();
 					}
-					// TODO: temperate value for location index. later use location config index
-					const size_t locationIdx = it->second.getLocationIndex(); 
-					if (!receiveClientData(fd, it)) // _config[it->second.getConfigIndex()]
+					if (!receiveClientData(fd, it)) // _config[it->second.getServerIndex()]
 						continue;
 					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
-					it->second.routing(_config[it->second.getConfigIndex()]);
+					it->second.routing(_config[it->second.getServerIndex()]);
 					
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
@@ -372,9 +370,10 @@ void	Server::acceptNewClient(int listenerFd)
 		Logger::fatal("acceptNewClient called with unknown listener fd");
 		throw ServerException();
 	}
-	// drain all pending connections
-	//TODO: Discuss: will it cause starvation if there are huge amount of client connections and keeps coming in new ones at the speed faster then our loop? static const size_t MAX_ACCEPT_PER_EVENT = 32 or 64
-	while (true)
+
+	size_t	acceptedCount = 0;
+
+	while (acceptedCount < MAX_ACCEPTS_PER_EVENT)
 	{
 		int clientFd = accept(listenerFd, NULL, NULL);
 		
@@ -410,9 +409,10 @@ void	Server::acceptNewClient(int listenerFd)
 
 		addPollFds(clientFd, POLLIN);
 
-		size_t	configIndex = listenerIt->second;
-		_clients[clientFd] = Client(clientFd, configIndex);
+		size_t	serverIndex = listenerIt->second;
+		_clients[clientFd] = Client(clientFd, serverIndex);
 
+		acceptedCount++;
 		Logger::debug("client connected: fd=" + std::to_string(clientFd));
 	}
 }
@@ -425,16 +425,40 @@ bool	Server::isClientFd(int fd) const
 template <typename ClientsIt>
 bool	Server::receiveClientData(int fd, ClientsIt it)
 {
-	char buffer[1024] = {0};
+	char buffer[1024];
 
-	ssize_t bytesReceived = recv(fd, buffer, sizeof(buffer) - 1, 0);
+	ssize_t bytesReceived = recv(fd, buffer, sizeof(buffer), 0);
 
 	if (bytesReceived > 0)
 	{
 		it->second.updateLastActivity();
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
-		ParseStatus status = it->second.parseRequest(buffer, _config[it->second.getConfigIndex()]);
+
+		it->second.appendReadBuffer(buffer, static_cast<size_t>(bytesReceived));
+
+		const ServerConfig& serverConfig = _config[it->second.getServerIndex()];
+
+		//set server-level default only once for this request
+		if (it->second.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
+			it->second.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
+
+		ParseStatus status = it->second.parseReadBuffer();
+
+		if (status == NEED_LOCATION)
+		{
+			it->second.matchLocation(serverConfig.locations);
+			size_t	locationIndex = it->second.getLocationIndex();
+			
+			if (locationIndex != static_cast<size_t>(-1))
+			{
+				const LocationConfig& location = serverConfig.locations[locationIndex];
+				//update maxBodySize to location config level
+				if (location.has_client_max_body_size)
+					it->second.setEffectiveMaxBodySize(location.client_max_body_size);
+			}
+			status = it->second.parseReadBuffer();
+		}
 		if (status == INCOMPLETE)
 			return false;
 		return true;

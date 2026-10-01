@@ -5,6 +5,7 @@
 enum	ParseStatus
 {
 	INCOMPLETE,
+	NEED_LOCATION,
 	COMPLETE,
 	ERROR
 };
@@ -34,7 +35,7 @@ class RequestParser
 {
 	public:
 		RequestParser();
-		ParseStatus	parse(const std::string& buffer, Request& req, size_t maxBodySize);
+		ParseStatus	parseRequest(const std::string& buffer, Request& req);
 		size_t	getConsumedBytes() const;
 		void	reset();
 

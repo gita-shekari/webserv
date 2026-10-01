@@ -22,11 +22,13 @@ enum	HttpStatus
 struct Request
 {
 	std::string	method;
-	std::string rawTarget;	// for debugging
+	std::string rawTarget;
 	std::string	path;
 	std::string	query;
 	std::string	version;
 	HttpStatus	httpStatus = REQ_OK;
+
+	size_t		effectiveMaxBodySize = static_cast<size_t>(-1);
 
 	std::map<std::string, std::string> headers;
 
