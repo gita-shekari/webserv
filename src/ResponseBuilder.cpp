@@ -150,7 +150,7 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 //	REQ_OK = 200,
 //	BAD_REQ = 400,
 //	PAGE_NOT_FOUND = 404,
-//	METHONDE_NOT_ALLOWED = 405,
+//	METHODE_NOT_ALLOWED = 405,
 //	PLAYLOAD_TOO_LARGE = 413,
 // 	INTERNAL_SERVER_ERR = 500,
 //	NOT_IMPLEMENTED = 501,

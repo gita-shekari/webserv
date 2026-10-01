@@ -16,7 +16,8 @@ enum	ConfigBehavior
 	UPLOAD,
 	DELETE,
 	DIRECTORU_LISTING,
-	STATIC
+	STATIC,
+	METHOD_NOT_FOUND
 };
 
 
@@ -42,6 +43,9 @@ class Client
 		// for appending information in buffer
 		ParseStatus	parseRequest(char *buffer, const ServerConfig& serverConfig);
 		void 		routing(const ServerConfig& serverConfig);
+
+		// client util
+		bool		isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path);
 
 		// for timer
 		void		updateLastActivity(void);
