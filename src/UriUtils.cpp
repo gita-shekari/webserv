@@ -161,7 +161,7 @@ bool	UriUtils::normalizePath(const std::string& input, std::string& output)
 	return true;
 }
 
-static int	UriUtils::hexValue(char c)
+int	UriUtils::hexValue(char c)
 {
 	if (c >= '0' && c <= '9')
 		return c - '0';

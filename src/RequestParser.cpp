@@ -7,7 +7,7 @@
 
 RequestParser::RequestParser(): _section(REQUEST_LINE), _cursor(0), _contentLength(0), _body(NO_BODY), _chunkState(CHUNK_SIZE), _chunkSize(0){}
 
-ParseStatus	RequestParser::parse(const std::string& buffer, Request& req, size_t maxBodySize)
+ParseStatus	RequestParser::parseRequest(const std::string& buffer, Request& req)
 {
 	while (_section != DONE)
 	{
@@ -18,7 +18,7 @@ ParseStatus	RequestParser::parse(const std::string& buffer, Request& req, size_t
 		else if (_section == HEADERS)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
-			status = parseBody(buffer, req, maxBodySize);
+			status = parseBody(buffer, req, req.effectiveMaxBodySize);
 		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
@@ -112,7 +112,7 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 
 	_cursor = lineEnd + 2;
 	_section = HEADERS;
-	return COMPLETE;
+	return NEED_LOCATION;
 }
 
 //TODO:	content-length if exist, can check for client_max_body_size. add a layer to fiind host and find the server and location to check for client_max_body_size before doing body parsing.

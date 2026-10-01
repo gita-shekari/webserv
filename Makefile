@@ -6,14 +6,14 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++11
 SRC = \
 	src/Client.cpp \
 	src/ConfigParser.cpp \
-	src/Http.cpp \
-	src/Logger.cpp \
+	test_files/test_match_location.cpp \
 	src/RequestParser.cpp \
-	src/ResponseBuilder.cpp \
-	src/Server.cpp \
-	src/UriUtils.cpp \
-	src/main.cpp
-#	test_files/server_nonblocking.cpp
+	src/UriUtils.cpp
+# 	src/Http.cpp \
+# 	src/Logger.cpp \
+# 	src/ResponseBuilder.cpp \
+# 	src/Server.cpp \
+# 	src/main.cpp
 
 OBJ = $(SRC:.cpp=.o)
 

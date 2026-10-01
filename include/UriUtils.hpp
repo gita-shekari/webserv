@@ -16,5 +16,5 @@ namespace UriUtils
 	bool	normalizePath(const std::string& input, std::string& output);
 
 	//helpers
-	static	int hexValue(char c);
+	int hexValue(char c);
 }
