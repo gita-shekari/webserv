@@ -108,24 +108,6 @@ std::string	toLower(const std::string& str)
 	return ret;
 }
 
-
-
-ConfigBehavior checkConfigBehavior(const ServerConfig& sc, const LocationConfig& lc, const Request& req)
-{
-	if (lc.cgiHandlers.size() != 0)
-	{
-		return CGI;
-	}
-	else if (lc.upload_store.size() != 0)
-	{
-		return UPLOAD;
-	}
-	else if (lc.redirectEnabled)
-	{
-		return REDIRECT;
-	}
-}
-
 // this function is a client class util
 bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
 {
@@ -154,6 +136,23 @@ bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, st
 	return true;
 }
 
+// helper
+std::string& getExtension(const std::string& reqPath)
+{
+	size_t idx = reqPath.size() - 1;
+	std::string tmp;
+	while (idx >= 0)
+	{
+		if (reqPath[idx] == '.')
+			break;
+		tmp += reqPath[idx];
+		idx--;
+	}
+	// TODO: should I make sure idx != 0? because we are sure it won't happen. 
+	std::string res = std::string(tmp.begin(), tmp.end());
+	return res;
+}
+
 void Client::routing(const ServerConfig& serverConfig)
 {
 
@@ -164,29 +163,39 @@ void Client::routing(const ServerConfig& serverConfig)
 	std::string filesystemPath = root + _request.path;
 	struct stat buf;
 	std::vector<std::string>::const_iterator it = std::find(lc.methods.begin(), lc.methods.end(), toLower(_request.method));
-	
 	if (it == lc.methods.end())
 		_request.httpStatus = METHODE_NOT_ALLOWED;
 	if(_request.httpStatus != REQ_OK || !isURIAllowed(serverConfig, &buf, filesystemPath))
 	{
 		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
 		return ;
-	}
-	
+	}			
+
 	if (S_ISDIR(buf.st_mode))
 	{
-		// is a directory
+		// TODO: make sure request.path will never be empty()
+		if (!_request.path.empty() && _request.path[_request.path.size() - 1] == '/')
+		{
+			return ; //handleDirectory(serverConfig);// handle directory
+		}
+		else
+		{
+			return ; //handleRedirect(301, _request.path + '/', serverConfig)// handle redirect and add / to the end;
+		}
 	}
 	if (S_ISREG(buf.st_mode))
 	{
-		// regular file
+		std::string& extension = getExtension(_request.path);
+		if (extension == "py" || extension == "php")
+		{
+			return ; //handleCGI(serverConfig, extension);
+		}
+		else
+		{
+			return ; // handleStatic(serverConfig);
+		}
 	}
 
-	ConfigBehavior action = checkConfigBehavior(serverConfig, lc, _request);
-
-	//else
-	//	_response = _builder.buildResponse(_request, serverConfig);
-	//_writeBuffer = _builder.serialize(_response);
 }
 void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 {

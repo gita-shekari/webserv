@@ -67,6 +67,7 @@ LocationConfig ConfigParser::parseLocation()
 	_current++;
 	if (_current >= _tokens.size())
 		throw std::runtime_error("Missing path after location");
+	// TODO: normalize the locaiton path to remove the / at the end. so /abc and /abc/ won't be considered as different ones. 
 	lc.path = _tokens[_current];
 	_current++;
 	if (_current >= _tokens.size() || _tokens[_current] != "{")

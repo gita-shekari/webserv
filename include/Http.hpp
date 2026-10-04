@@ -9,6 +9,8 @@
 enum	HttpStatus
 {
 	REQ_OK = 200,
+	MOVED_PERMANENTLY = 301,
+	
 	BAD_REQ = 400,
 	FORBIDDEN = 403,
 	PAGE_NOT_FOUND = 404,

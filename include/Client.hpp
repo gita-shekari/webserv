@@ -9,16 +9,16 @@
 # include <cstddef> //for size_t
 # include <chrono> // for steady_clock
 
-enum	ConfigBehavior
-{
-	REDIRECT,
-	CGI,
-	UPLOAD,
-	DELETE,
-	DIRECTORU_LISTING,
-	STATIC,
-	METHOD_NOT_FOUND
-};
+//enum	ConfigBehavior
+//{
+//	REDIRECT,
+//	CGI,
+//	UPLOAD,
+//	DELETE,
+//	DIRECTORU_LISTING,
+//	STATIC,
+//	METHOD_NOT_FOUND
+//};
 
 
 class Client
@@ -43,12 +43,9 @@ class Client
 		void		setEffectiveMaxBodySize(size_t size);
 		void		disConnected(void);
 
-		// for appending information in buffer
-
-		ParseStatus	parseRequest(char *buffer, const ServerConfig& serverConfig); //maybe not use anymore
-
 		// client util
 		bool		isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path);
+		
 		// for request processing
 		void		appendReadBuffer(const char *data, size_t size);
 		ParseStatus	parseReadBuffer(void);
