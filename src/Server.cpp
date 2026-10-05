@@ -526,7 +526,7 @@ bool	Server::sendClientData(int fd)
 		it->second.updateLastActivity();
 	if (bytesSent < 0)
 		return false;
-		return true;
+	return true;
 }
 
 void	Server::removeCloseClient(void)

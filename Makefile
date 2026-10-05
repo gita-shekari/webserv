@@ -9,6 +9,7 @@ SRC = src/main.cpp \
 	src/ConfigParser.cpp \
 	src/ResponseBuilder.cpp \
 	src/Server.cpp \
+	src/UriUtils.cpp \
 	src/Logger.cpp
 OBJ = $(SRC:.cpp=.o)
 

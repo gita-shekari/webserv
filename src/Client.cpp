@@ -117,6 +117,7 @@ std::string getExtension(const std::string& reqPath)
 // this function is a client class util
 bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
 {
+	(void)serverConfig;
 	if (stat(path.c_str(), buf) == -1)
 	{
 		int	saveErr = errno;

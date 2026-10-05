@@ -152,25 +152,30 @@ std::string ResponseBuilder::getReasonPhrase(int statusCode)
 
 	return "Internal Server Error";
 }
-
 Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig& serverConfig)
 {
 	Response response;
-	(void)serverConfig;
 	response.version = "HTTP/1.1";
 	response.statusCode = statusCode;
 	response.reasonPhrase = getReasonPhrase(statusCode);
-	// need to chnage this part, each error has its own error_page
-	///std::string errorPath =	serverConfig.root + "/" + serverConfig.error_pages;
-	// if (!getSource(errorPath, response.body))
-	// {
-		response.body =
-			"<html><body><h1>"
-			+ std::to_string(response.statusCode)
-			+ " "
-			+ response.reasonPhrase
-			+ "</h1></body></html>";
-	// }
+
+	std::map<int, std::string>::const_iterator it = serverConfig.error_pages.find(statusCode);
+	if(it != serverConfig.error_pages.end())
+	{
+		std::string errorPath = serverConfig.root + "/" + it->second;
+		if (!getSource(errorPath, response.body))
+		{
+			response.statusCode = 500;
+			response.reasonPhrase = getReasonPhrase(500);
+			std::map<int, std::string>::const_iterator internalError;
+			internalError = serverConfig.error_pages.find(500);
+			if (internalError != serverConfig.error_pages.end())
+			{
+				std::string internalErrorPath = serverConfig.root + "/" + internalError->second;
+				getSource(internalErrorPath, response.body);
+			}
+		}
+	}
 	response.headers["Content-Type"] = "text/html";
 	response.headers["Content-Length"] = std::to_string(response.body.size());
 	return response;
