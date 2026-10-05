@@ -1,11 +1,13 @@
 #include "RequestParser.hpp"
+#include "UriUtils.hpp"
+
 #include <iostream>
 #include <cctype>
 #include <limits>
 
 RequestParser::RequestParser(): _section(REQUEST_LINE), _cursor(0), _contentLength(0), _body(NO_BODY), _chunkState(CHUNK_SIZE), _chunkSize(0){}
 
-ParseStatus	RequestParser::parse(const std::string& buffer, Request& req, size_t maxBodySize)
+ParseStatus	RequestParser::parseRequest(const std::string& buffer, Request& req)
 {
 	while (_section != DONE)
 	{
@@ -16,7 +18,7 @@ ParseStatus	RequestParser::parse(const std::string& buffer, Request& req, size_t
 		else if (_section == HEADERS)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
-			status = parseBody(buffer, req, maxBodySize);
+			status = parseBody(buffer, req, req.effectiveMaxBodySize);
 		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
@@ -75,9 +77,9 @@ void	RequestParser::printAttributes() const
 	std::cout << "--->" << std::endl;
 }
 
-ParseStatus RequestParser::error(Request& req, HttpStatus err)
+ParseStatus RequestParser::error(Request& req, HttpStatus status)
 {
-	req.httpStatus = err;
+	req.httpStatus = status;
 	return ERROR;
 }
 
@@ -98,25 +100,22 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 		|| secondSpace == firstSpace + 1
 		|| secondSpace + 1 >= line.size())
 		return error(req, BAD_REQ);
+
 	req.method = line.substr(0, firstSpace);
 	req.rawTarget = line.substr(firstSpace + 1, secondSpace - firstSpace - 1);
 	req.version = line.substr(secondSpace + 1);
 	if (req.version != "HTTP/1.1")
 		return error(req, HTTP_VERSION_NOT_NSUP);
 
-	size_t	qMark = req.rawTarget.find('?');
-	if (qMark == std::string::npos)
-		req.path = req.rawTarget;
-	else
-	{
-		req.path = req.rawTarget.substr(0, qMark);
-		req.query = req.rawTarget.substr(qMark + 1);
-	}
+	if (!UriUtils::handleRawTarget(req))
+		return error(req, BAD_REQ);
+
 	_cursor = lineEnd + 2;
 	_section = HEADERS;
-	return COMPLETE;
+	return NEED_LOCATION;
 }
 
+//TODO:	content-length if exist, can check for client_max_body_size. add a layer to fiind host and find the server and location to check for client_max_body_size before doing body parsing.
 ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 {
 	size_t	headerEnd = buffer.find("\r\n\r\n", _cursor);

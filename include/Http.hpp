@@ -9,9 +9,11 @@
 enum	HttpStatus
 {
 	REQ_OK = 200,
+	MOVED_PERMANENTLY = 301,
 	BAD_REQ = 400,
+	FORBIDDEN = 403,
 	PAGE_NOT_FOUND = 404,
-	METHONDE_NOT_ALLOWED = 405,
+	METHODE_NOT_ALLOWED = 405,
 	PLAYLOAD_TOO_LARGE = 413,
 	INTERNAL_SERVER_ERR = 500,
 	NOT_IMPLEMENTED = 501,
@@ -21,11 +23,13 @@ enum	HttpStatus
 struct Request
 {
 	std::string	method;
-	std::string rawTarget;	// for debugging
+	std::string rawTarget;
 	std::string	path;
 	std::string	query;
 	std::string	version;
 	HttpStatus	httpStatus = REQ_OK;
+
+	size_t		effectiveMaxBodySize = static_cast<size_t>(-1);
 
 	std::map<std::string, std::string> headers;
 

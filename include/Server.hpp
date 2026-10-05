@@ -23,27 +23,38 @@
 class Server
 {
 	public:
-
 		Server(const std::vector<ServerConfig>& config);
 		~Server(void);
 
-		int start();
+		int		start(void);
 
+		//getters
 		bool	getRunning(void);
-		int		getSocketFd(void);
 
 		// system methods
-		void	setsocket(void);
-		void	setPollFds(void);
 		void	runningLoop(void);
+		void 	handlePollCallError(int& eagainCount);
+		bool	handlePollException(int fd, short revents);
+		void	addPollFds(int fd, short events);
+		bool	setNonBlocking(int fd);
 
-		// methods for loop
-		void			acceptNewClient(void);
+		// for listen fd
+		void	validateUniquePorts(void) const;
+		void	setListeningSockets(void);
+		int		createListeningSocket(const ServerConfig& config);
+		bool	isListeningFd(int fd) const;
+
+		// for client fd
+		void	acceptNewClient(int listenerFd);
+		bool	isClientFd(int fd) const;
 		template <typename ClientsIt>
-		bool			receiveClientData(int fd, ClientsIt it);
-		void			markForClose(int fd);
-		bool			sendClientData(int fd);
-		void			removeCloseClient();
+		bool	receiveClientData(int fd, ClientsIt it);
+		void	markForClose(int fd);
+		bool	sendClientData(int fd);
+		void	removeCloseClient();
+
+		// for timeout
+		void	checkTimeouts(void);
 
 		class ServerException : public std::exception
 		{
@@ -51,11 +62,17 @@ class Server
 		};
 
 	private:
-		int							_socketFd;
-		bool						_isRunning;
-		std::vector<struct pollfd>	_pollfds;
-		std::map<int, Client>		_clients;
-		const std::vector<ServerConfig>&  _config;
+		static const int	CLIENT_TIMEOUT_SEC = 30;
+		static const int	POLL_TIMEOUT_MS = 1000;
+
+		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
+
+		bool										_isRunning;
+		const std::vector<struct ServerConfig>& 	_config;
+		std::vector<struct pollfd>					_pollfds;
+
+		std::map<int, size_t>						_listeners;
+		std::map<int, Client>						_clients;
 
 		Server(void);
 };
