@@ -52,6 +52,10 @@ class Client
 		void		matchLocation(const std::vector<LocationConfig>& location);
 		void 		routing(const ServerConfig& serverConfig);
 
+		// handle routings
+		void		handleDirectory(const ServerConfig& ServerConfig, std::string& fullPath);
+		void		handleRegularFile(const ServerConfig& serverConfig, std::string& path);
+
 		// for timer
 		void		updateLastActivity(void);
 

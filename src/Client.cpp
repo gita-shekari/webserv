@@ -2,6 +2,7 @@
 #include <vector>
 #include <algorithm>
 #include <sys/stat.h>
+#include <dirent.h>
 
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
@@ -107,6 +108,22 @@ std::string	toLower(const std::string& str)
 		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
 	return ret;
 }
+// helper
+std::string& getExtension(const std::string& reqPath)
+{
+	size_t idx = reqPath.size() - 1;
+	std::string tmp;
+	while (idx >= 0)
+	{
+		if (reqPath[idx] == '.')
+			break;
+		tmp += reqPath[idx];
+		idx--;
+	}
+	// TODO: should I make sure idx != 0? because we are sure it won't happen. 
+	std::string res = std::string(tmp.begin(), tmp.end());
+	return res;
+}
 
 // this function is a client class util
 bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
@@ -136,21 +153,63 @@ bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, st
 	return true;
 }
 
-// helper
-std::string& getExtension(const std::string& reqPath)
+void Client::handleDirectory(const ServerConfig& serverConfig, std::string& fullPath)
 {
-	size_t idx = reqPath.size() - 1;
-	std::string tmp;
-	while (idx >= 0)
+	const LocationConfig lc = serverConfig.locations[_locationIndex];
+	// if req method is GET
+	if (toLower(_request.method) == "get")
 	{
-		if (reqPath[idx] == '.')
-			break;
-		tmp += reqPath[idx];
-		idx--;
+		if (lc.index.empty() && !lc.autoindex)
+		{
+			_request.httpStatus = FORBIDDEN;
+			_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+			return ;
+		}
+		else if (lc.index.empty()) // handleDirectoryListing
+		{
+			DIR *dir = opendir(fullPath.c_str());
+			struct dirent *ent;
+			if (dir != NULL)
+			{
+				// readdir(dir)
+				// closedir(dir);
+			}
+			else
+			{
+				//error with open directory
+			}
+		}
+		else
+		{
+			std::string newPath = fullPath + lc.index;
+			handleRegularFile(serverConfig, newPath);
+		}
+
 	}
-	// TODO: should I make sure idx != 0? because we are sure it won't happen. 
-	std::string res = std::string(tmp.begin(), tmp.end());
-	return res;
+
+	// if req method is POST
+	if (toLower(_request.method) == "post")
+	{
+
+	}
+	// if req method is DELETE
+	if (toLower(_request.method) == "delete")
+	{
+
+	}
+}
+
+void	Client::handleRegularFile(const ServerConfig& serverConfig, std::string& path)
+{
+	std::string& extension = getExtension(path);
+	if (extension == "py" || extension == "php")
+	{
+		return ; //handleCGI(serverConfig, extension);
+	}
+	else
+	{
+		return ; // handleStatic(serverConfig);
+	}
 }
 
 void Client::routing(const ServerConfig& serverConfig)
@@ -176,7 +235,7 @@ void Client::routing(const ServerConfig& serverConfig)
 		// TODO: make sure request.path will never be empty()
 		if (!_request.path.empty() && _request.path[_request.path.size() - 1] == '/')
 		{
-			return ; //handleDirectory(serverConfig);// handle directory
+			return handleDirectory(serverConfig, filesystemPath);// handle directory
 		}
 		else
 		{
@@ -185,22 +244,14 @@ void Client::routing(const ServerConfig& serverConfig)
 	}
 	if (S_ISREG(buf.st_mode))
 	{
-		std::string& extension = getExtension(_request.path);
-		if (extension == "py" || extension == "php")
-		{
-			return ; //handleCGI(serverConfig, extension);
-		}
-		else
-		{
-			return ; // handleStatic(serverConfig);
-		}
+		return handleRegularFile(serverConfig, _request.path);
 	}
 
 }
 void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 {
 	size_t	longestMatch = 0;
-
+	//TODO: make sure to check if there is no matching location
 	for (size_t i = 0; i < locations.size(); ++i)
 	{
 		const std::string& locationPath = locations[i].path;
