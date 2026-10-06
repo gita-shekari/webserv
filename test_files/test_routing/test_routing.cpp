@@ -1,106 +1,95 @@
-#include "Client.hpp"
-#include <vector>
-#include <algorithm>
+#include <iostream>
+#include <string>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <map>
+#include <vector>
 
-Client::Client(int fd, size_t serverIndex)
-	: _fd(fd),
-	  _serverIndex(serverIndex),
-	  _isConnected(true),
-	  _lastActivity(std::chrono::steady_clock::now())
+enum	HttpStatus
 {
-	std::cout << "A client is created fd: " << fd << std::endl;
-}
+	REQ_OK = 200,
+	CREATED = 201,
+	MOVED_PERMANENTLY = 301,
+	BAD_REQ = 400,
+	FORBIDDEN = 403,
+	PAGE_NOT_FOUND = 404,
+	METHODE_NOT_ALLOWED = 405,
+	PLAYLOAD_TOO_LARGE = 413,
+	INTERNAL_SERVER_ERR = 500,
+	NOT_IMPLEMENTED = 501,
+	HTTP_VERSION_NOT_NSUP = 505
+};
 
-Client::~Client(void)
+struct Request
 {
-	std::cout << "fd " << _fd << " is destroyed" << std::endl;
-}
+	std::string	method;
+	std::string rawTarget;
+	std::string	path;
+	std::string	query;
+	HttpStatus	httpStatus = REQ_OK;
+	std::map<std::string, std::string> headers;
+	std::string	body;
 
-int		Client::getFd(void)
+	Request(){};
+	Request(std::string met, std::string pt, HttpStatus htt) 
+		: method(met), path(pt), httpStatus(htt) {}
+};
+
+struct LocationConfig
 {
-	return _fd;
-}
+	std::string path;
+	std::vector<std::string> methods;
+	std::string root;
+	size_t 		client_max_body_size; 
+	bool 		has_client_max_body_size;
 
-size_t	Client::getServerIndex(void) const
+	std::string index;
+	bool 		autoindex = false;
+	std::string upload_store;
+	std::map<std::string, std::string> cgiHandlers;
+	bool 		redirectEnabled = false;
+	int 		redirectStatus = 0;
+	std::string redirectTarget;
+
+	LocationConfig(std::string idx, std::vector<std::string> mets, bool autoidx, std::string path, bool redirEabled, int redirStatus, std::string redirTar, std::string root, std::string up_store)
+		: index(idx), methods(mets), autoindex(autoidx), path(path), redirectEnabled(redirEabled), redirectStatus(redirStatus), redirectTarget(redirTar), upload_store(up_store) {}
+};
+
+struct ServerConfig
 {
-	return _serverIndex;
-}
+	int port = 0;
+	std::string root = "";
+	std::string index = "";
+	std::string error_page;
+	std::vector<LocationConfig> locations;
+};
 
-size_t	Client::getLocationIndex(void) const
+
+class TestClient
 {
-	return _locationIndex;
-}
+	public:
+		TestClient(size_t lcIdx, Request& req);
+		bool isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path);
+		
 
-size_t	Client::getEffectiveMaxBodySize(void) const
+		void	handleDirectory(const ServerConfig& serverConfig, std::string& fullPath);
+		void routing(const ServerConfig& serverConfig);
+
+		void handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
+		// handleRedirect()
+		// handleStatic()
+		// handleCGI()
+	private:
+		size_t			_locationIndex = static_cast<size_t>(0);
+		Request			_request; //current request
+};
+
+TestClient::TestClient(size_t lcIdx, Request& req)
 {
-	return _request.effectiveMaxBodySize;
+	_locationIndex = lcIdx;
+	_request = req;
 }
-
-size_t	Client::getLocationIndex(void) const
-{
-	return _locationIndex;
-}
-
-bool	Client::getIsConnected(void)
-{
-	return _isConnected;
-}
-
-std::string Client::getWriteBuffer()
-{
-	return _writeBuffer;
-}
-
-Request	Client::getReq(void)
-{
-	return _request;
-}
-
-std::chrono::steady_clock::time_point	Client::getLastActivity(void) const
-{
-	return _lastActivity;
-}
-
-void	Client::setRequestPath(const std::string& str)
-{
-	_request.path = str;
-}
-
-void	Client::setEffectiveMaxBodySize(size_t size)
-{
-	_request.effectiveMaxBodySize = size;
-}
-
-void	Client::disConnected(void)
-{
-	_isConnected = false;
-}
-
-void	Client::appendReadBuffer(const char* data, size_t size)
-{
-	_readBuffer.append(data, size);
-}
-ParseStatus	Client::parseReadBuffer(void)
-{
-	ParseStatus status = _parser.parseRequest(_readBuffer, _request);
-	if (status == COMPLETE)
-		_readBuffer.clear();
-	return status;
-}
-
-//enum	ConfigBehavior
-//{
-//	REDIRECT,
-//	CGI,
-//	UPLOAD,
-//	DELETE,
-//	DIRECTORU_LISTING,
-//	STATIC,
-//  METHOD_NOT_FOUND
-//};
-
+// from here is functions that will be needed.
 std::string	toLower(const std::string& str)
 {
 	std::string	ret = str;
@@ -130,7 +119,7 @@ bool isCGI(const ServerConfig& serverConfig, const std::string& path)
 }
 
 // this function is a client class util
-bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
+bool TestClient::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
 {
 	if (stat(path.c_str(), buf) == -1)
 	{
@@ -161,7 +150,7 @@ bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, st
 	return true;
 }
 
-void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
+void TestClient::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
 {
 	DIR *dir = opendir(fullPath.c_str());
 			
@@ -215,7 +204,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 	}
 }
 
-void Client::handleDirectory(const ServerConfig& serverConfig, std::string& fullPath)
+void TestClient::handleDirectory(const ServerConfig& serverConfig, std::string& fullPath)
 {
 	const LocationConfig lc = serverConfig.locations[_locationIndex];
 
@@ -274,7 +263,7 @@ void Client::handleDirectory(const ServerConfig& serverConfig, std::string& full
 
 
 
-void Client::routing(const ServerConfig& serverConfig)
+void TestClient::routing(const ServerConfig& serverConfig)
 {
 	std::string root = serverConfig.root;
 	const LocationConfig lc = serverConfig.locations[_locationIndex];
@@ -320,70 +309,39 @@ void Client::routing(const ServerConfig& serverConfig)
 		}
 	}
 }
-void	Client::matchLocation(const std::vector<LocationConfig>& locations)
-{
-	size_t	longestMatch = 0;
-	//TODO: make sure to check if there is no matching location
-	for (size_t i = 0; i < locations.size(); ++i)
-	{
-		const std::string& locationPath = locations[i].path;
-		size_t	length = locationPath.size();
 
-		if (length > _request.path.size())
-			continue;
-		
-		if (_request.path.compare(0, length, locationPath) != 0)
-			continue;
-		
-		bool validBoundary = (length == _request.path.size())
-							|| (locationPath == "/")
-							|| (_request.path[length] == '/');
-		if (!validBoundary)
-			continue;
-		
-		if (length > longestMatch)
-		{
-			longestMatch = length;
-			_locationIndex = i;
-		}
-	}
+
+void initServerConfig(struct ServerConfig& sc)
+{
+	sc.index = "";
+	sc.root = "fixtures/www";
 }
 
-//enum	ConfigBehavior
-//{
-//	REDIRECT,
-//	CGI,
-//	UPLOAD,
-//	DELETE,
-//	DIRECTORU_LISTING,
-//	STATIC
-//};
-
-// ConfigBehavior checkConfigBehavior(const ServerConfig& sc, const LocationConfig& lc, const Request& req)
-// {
-// 	std::string root = sc.root;
-// 	if (lc.root.size() != 0)
-// 		root = lc.root;
-// 	root + lc.path;
-// 	if (lc.cgiHandlers.size() != 0)
-// }
-
-// void Client::routing(const ServerConfig& serverConfig)
-// {
-// 	if(_request.httpStatus != REQ_OK)
-// 	{
-// 		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-// 	}
-// 	else
-// 	{
-// 		ConfigBehavior action = checkConfigBehavior(serverConfig, serverConfig.locations[_locationIndex], _request);
-// 	}
-// 	//else
-// 	//	_response = _builder.buildResponse(_request, serverConfig);
-// 	//_writeBuffer = _builder.serialize(_response);
-// }
-
-void	Client::updateLastActivity(void)
+int main(void)
 {
-	_lastActivity = std::chrono::steady_clock::now();
+	struct ServerConfig	sc;
+	initServerConfig(sc);
+	
+	// check directory listing 
+	struct LocationConfig lc("", {"get"}, true, "/listing", false, -1, "", "", "");
+	sc.locations.push_back(lc);
+	struct Request req_tailed("get", "/listing/", REQ_OK);
+	struct Request req_notailed("get", "/listing", REQ_OK);
+
+
+	size_t indexToTest = 0;
+	TestClient client(indexToTest, req_tailed);
+	client.routing(sc);
+
+	TestClient client2(indexToTest, req_notailed);
+	client2.routing(sc);
+
+	//index(idx), methods(mets), autoindex(autoidx), path(path), redirectEnabled(redirEabled), redirectStatus(redirStatus), redirectTarget(redirTar), upload_store(up_store)
+	struct LocationConfig lc1("index.html", {"get"}, true, "/with_index", false, -1, "", "", "");
+	sc.locations.push_back(lc1);
+	indexToTest++;
+	struct Request req_index("get", "/with_index/", REQ_OK);
+	TestClient client3(indexToTest, req_index);
+	client3.routing(sc);
+
 }

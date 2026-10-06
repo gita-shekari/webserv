@@ -54,7 +54,12 @@ class Client
 
 		// handle routings
 		void		handleDirectory(const ServerConfig& ServerConfig, std::string& fullPath);
-		void		handleRegularFile(const ServerConfig& serverConfig, std::string& path);
+		void 		routing(const ServerConfig& serverConfig);
+		
+		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
+		// handleRedirect()
+		// handleStatic()
+		// handleCGI()
 
 		// for timer
 		void		updateLastActivity(void);
