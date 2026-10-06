@@ -137,6 +137,8 @@ std::string ResponseBuilder::getReasonPhrase(int statusCode)
 {
 	if (statusCode == 400)
 		return "Bad Request";
+	if (statusCode == 403)
+		return "Forbidden";
 	if (statusCode == 404)
 		return "Not Found";
 	if (statusCode == 405)
@@ -145,12 +147,7 @@ std::string ResponseBuilder::getReasonPhrase(int statusCode)
 		return "Payload Too Large";
 	if (statusCode == 500)
 		return "Internal Server Error";
-	if (statusCode == 501)
-		return "Not Implemented";
-	if (statusCode == 505)
-		return "HTTP Version Not Supported";
-
-	return "Internal Server Error";
+	return "Unknown Error";
 }
 Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig& serverConfig)
 {
@@ -158,23 +155,30 @@ Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig&
 	response.version = "HTTP/1.1";
 	response.statusCode = statusCode;
 	response.reasonPhrase = getReasonPhrase(statusCode);
+	std::map<int, std::string>::const_iterator it =
+		serverConfig.error_pages.find(statusCode);
 
-	std::map<int, std::string>::const_iterator it = serverConfig.error_pages.find(statusCode);
-	if(it != serverConfig.error_pages.end())
+	if (it != serverConfig.error_pages.end())
 	{
-		std::string errorPath = serverConfig.root + "/" + it->second;
-		if (!getSource(errorPath, response.body))
+		std::string errorPath =
+			serverConfig.root + "/" + it->second;
+		if (getSource(errorPath, response.body))
 		{
-			response.statusCode = 500;
-			response.reasonPhrase = getReasonPhrase(500);
-			std::map<int, std::string>::const_iterator internalError;
-			internalError = serverConfig.error_pages.find(500);
-			if (internalError != serverConfig.error_pages.end())
-			{
-				std::string internalErrorPath = serverConfig.root + "/" + internalError->second;
-				getSource(internalErrorPath, response.body);
-			}
+			response.headers["Content-Type"] = "text/html";
+			response.headers["Content-Length"] = std::to_string(response.body.size());
+			return response;
 		}
+	}
+	// The requested error page is missing
+	response.statusCode = 500;
+	response.reasonPhrase = getReasonPhrase(500);
+	std::map<int, std::string>::const_iterator internalError =
+		serverConfig.error_pages.find(500);
+	if (internalError != serverConfig.error_pages.end())
+	{
+		std::string internalErrorPath =
+			serverConfig.root + "/" + internalError->second;
+		getSource(internalErrorPath, response.body);
 	}
 	response.headers["Content-Type"] = "text/html";
 	response.headers["Content-Length"] = std::to_string(response.body.size());

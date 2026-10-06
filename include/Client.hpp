@@ -50,11 +50,16 @@ class Client
 		void		appendReadBuffer(const char *data, size_t size);
 		ParseStatus	parseReadBuffer(void);
 		void		matchLocation(const std::vector<LocationConfig>& location);
-		void 		routing(const ServerConfig& serverConfig);
+		
 
 		// handle routings
 		void		handleDirectory(const ServerConfig& ServerConfig, std::string& fullPath);
-		void		handleRegularFile(const ServerConfig& serverConfig, std::string& path);
+		void 		routing(const ServerConfig& serverConfig);
+
+		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
+		// handleRedirect()
+		// handleStatic()
+		// handleCGI()
 
 		// for timer
 		void		updateLastActivity(void);
