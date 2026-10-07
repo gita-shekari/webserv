@@ -302,28 +302,26 @@ void ConfigParser::parseErrorPage(ServerConfig& sc)
 /* ************************************************************************** */
 /*                           LOCATION DIRECTIVES                              */
 /* ************************************************************************** */
-
+std::string	Lower(const std::string& str)
+{
+	std::string	ret = str;
+	for (size_t i = 0; i < ret.size(); ++i)
+		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
+	return ret;
+}
 void ConfigParser::parseMethods(LocationConfig& lc)
 {
 	expect("methods");
 
-	if (_current >= _tokens.size() ||
-		_tokens[_current] == ";")
-		throw std::runtime_error(
-			"At least one method is required");
-
-	while (_current < _tokens.size() &&
-		   _tokens[_current] != ";")
+	if (_current >= _tokens.size() || _tokens[_current] == ";")
+		throw std::runtime_error("At least one method is required");
+	while (_current < _tokens.size() &&  _tokens[_current] != ";")
 	{
 		if (!isValidMethod(_tokens[_current]))
-			throw std::runtime_error(
-				"Invalid HTTP method: " + _tokens[_current]);
-
-		lc.methods.push_back(_tokens[_current]);
-
+			throw std::runtime_error("Invalid HTTP method: " + _tokens[_current]);
+		lc.methods.push_back(Lower(_tokens[_current]));
 		_current++;
 	}
-
 	expect(";");
 }
 
@@ -637,8 +635,7 @@ ServerConfig ConfigParser::parseServer()
 		else if (_tokens[_current] == "root")
 			parseRoot(sc.root);
 
-		else if (_tokens[_current] ==
-				 "client_max_body_size")
+		else if (_tokens[_current] == "client_max_body_size")
 			parseClientMaxBodySize(sc);
 
 		else if (_tokens[_current] == "error_page")
@@ -648,15 +645,10 @@ ServerConfig ConfigParser::parseServer()
 			sc.locations.push_back(parseLocation());
 
 		else
-			throw std::runtime_error(
-				"Unknown server directive: " +
-				_tokens[_current]);
+			throw std::runtime_error("Unknown server directive: " + _tokens[_current]);
 	}
-
 	expect("}");
-
 	validateServer(sc);
-
 	return sc;
 }
 
