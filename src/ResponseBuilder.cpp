@@ -29,25 +29,7 @@ std::string ResponseBuilder::serialize(const Response& response)
 	res += response.body;
 	return res;
 }
-// Request.method
-//     ↓
-// used to DECIDE what to do
 
-// Request.path
-//     ↓
-// used to DECIDE which resource is requested
-
-// Request.version
-//     ↓
-// may influence protocol handling
-
-// Request.headers
-//     ↓
-// some may influence response behavior
-
-// Request.body
-//     ↓
-// important especially for POST
 bool ResponseBuilder::getSource(const std::string& path, std::string& content)
 {
 	std::ifstream src(path.c_str());
@@ -58,7 +40,31 @@ bool ResponseBuilder::getSource(const std::string& path, std::string& content)
 	content = buffer.str();
 	return true;
 }
-
+std::string ResponseBuilder::getContentType(const std::string& path)
+{
+	size_t dotPos = path.find_last_of('.');
+	if(dotPos == std::string::npos)
+		return "application/octet-stream";
+	std::string extension = path.substr(dotPos + 1);
+	if(extension == "html" || extension == "htm")
+		return "text/html";
+	else if(extension == "css")
+		return "text/css";
+	else if(extension == "js")
+		return "application/javascript";
+	else if(extension == "json")
+		return "application/json";
+	else if(extension == "png")
+		return "image/png";
+	else if(extension == "jpg" || extension == "jpeg")
+		return "image/jpeg";
+	else if(extension == "gif")
+		return "image/gif";
+	else if(extension == "txt")
+		return "text/plain";
+	else
+		return "application/octet-stream";
+}
 std::string ResponseBuilder::getReasonPhrase(int statusCode)
 {
 	switch(statusCode)
