@@ -1,0 +1,1 @@
+If index handling works, this filename should not appear in a directory listing.

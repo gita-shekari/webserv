@@ -18,7 +18,7 @@ ParseStatus	RequestParser::parseRequest(const std::string& buffer, Request& req)
 		else if (_section == HEADERS)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
-			status = parseBody(buffer, req, req.effectiveMaxBodySize);
+			status = parseBody(buffer, req);
 		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
@@ -160,12 +160,12 @@ ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 	return (judgeBody(req));
 }
 
-ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req, size_t maxBodySize)
+ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req)
 {
 	if (_body == CONTENT_LENGTH_BODY)
 		return parseContentLengthBody(buffer, req);
 	if (_body == CHUNKED_BODY)
-		return parseChunkedBody(buffer, req, maxBodySize);
+		return parseChunkedBody(buffer, req);
 	return ERROR;
 }
 
@@ -201,6 +201,8 @@ ParseStatus	RequestParser::judgeBody(Request& req)
 
 ParseStatus	RequestParser::parseContentLengthBody(const std::string& buffer, Request& req)
 {
+	if (_contentLength > req.effectiveMaxBodySize)
+		return error(req, PAYLOAD_TOO_LARGE);
 	size_t	bodyLength = buffer.size() - _cursor;
 	if (bodyLength < _contentLength)
 		return INCOMPLETE;
@@ -210,7 +212,7 @@ ParseStatus	RequestParser::parseContentLengthBody(const std::string& buffer, Req
 	return COMPLETE;
 }
 
-ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req, size_t maxBodySize)
+ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req)
 {
 	while (true)
 	{
@@ -231,6 +233,11 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 			if (!parseHexSize(sizeNum, _chunkSize))
 				return error(req, BAD_REQ);
 			_cursor = sizeEnd + 2;
+
+			if (req.body.size() > req.effectiveMaxBodySize
+				|| _chunkSize > req.effectiveMaxBodySize - req.body.size())
+				return error(req, PAYLOAD_TOO_LARGE);
+
 			if (_chunkSize == 0)
 			{
 				if (buffer.size() - _cursor < 2)
@@ -250,8 +257,6 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				return INCOMPLETE;
 			if (buffer[_cursor + _chunkSize] != '\r' || buffer[_cursor + _chunkSize + 1] != '\n')
 				return error(req, BAD_REQ);
-			if (req.body.size() > maxBodySize || _chunkSize > maxBodySize - req.body.size())
-				return error(req, PLAYLOAD_TOO_LARGE);
 			req.body.append(buffer, _cursor, _chunkSize);
 			_cursor += _chunkSize + 2;
 			_chunkState = CHUNK_SIZE;

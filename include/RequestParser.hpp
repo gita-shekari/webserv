@@ -53,12 +53,12 @@ class RequestParser
 		ParseStatus error(Request& req, HttpStatus status);
 		ParseStatus	parseRequestLine(const std::string& buffer, Request& req);
 		ParseStatus	parseHeaders(const std::string& buffer, Request& req);
-		ParseStatus	parseBody(const std::string& buffer, Request& req, size_t maxBodySize);
+		ParseStatus	parseBody(const std::string& buffer, Request& req);
 
 		ParseStatus	judgeBody(Request& req);
 
 		ParseStatus	parseContentLengthBody(const std::string& buffer, Request& req);
-		ParseStatus	parseChunkedBody(const std::string& buffer, Request& req,  size_t maxBodySize);
+		ParseStatus	parseChunkedBody(const std::string& buffer, Request& req);
 
 		//parse size
 		bool	parseDecSize(const std::string& str, size_t& size);

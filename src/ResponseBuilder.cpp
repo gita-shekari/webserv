@@ -151,7 +151,7 @@ Response ResponseBuilder::buildGetResponse(const Request& request, const ServerC
 //	BAD_REQ = 400,
 //	PAGE_NOT_FOUND = 404,
 //	METHONDE_NOT_ALLOWED = 405,
-//	PLAYLOAD_TOO_LARGE = 413,
+//	PAYLOAD_TOO_LARGE = 413,
 // 	INTERNAL_SERVER_ERR = 500,
 //	NOT_IMPLEMENTED = 501,
 //	HTTP_VERSION_NOT_NSUP = 505
