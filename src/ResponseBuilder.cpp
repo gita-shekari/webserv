@@ -100,20 +100,120 @@ Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig&
 			return response;
 		}
 	}
+	response.statusCode = 500;
+	response.reasonPhrase = getReasonPhrase(500);
+	if(getSource(serverConfig.root + "/500.html", response.body))
+	{
+		response.headers["Content-Length"] = std::to_string(response.body.size());
+		return response;
+	}
 	else
 	{
-		response.statusCode = 500;
-		response.reasonPhrase = getReasonPhrase(500);
-		if(getSource(serverConfig.root + "/500.html", response.body))
+		response.body = "<html><body><h1>500 Internal Server Error</h1></body></html>";
+		response.headers["Content-Length"] = std::to_string(response.body.size());
+		return response;
+	}
+}
+
+Response ResponseBuilder::buildStaticResponse(const std::string& filePath, const ServerConfig& serverConfig)
+{
+	Response response;
+	if (!getSource(filePath, response.body))
+		return buildErrorResponse(404, serverConfig);
+	response.version = "HTTP/1.1";
+	response.statusCode = 200;
+	response.reasonPhrase = getReasonPhrase(200);
+	response.headers["Content-Type"] = getContentType(filePath);
+	response.headers["Content-Length"] = std::to_string(response.body.size());
+	return response;
+}
+
+Response ResponseBuilder::buildRedirectResponse(int statusCode, const std::string& location)
+{
+	Response response;
+	response.version = "HTTP/1.1";
+	response.statusCode = statusCode;
+	response.reasonPhrase = getReasonPhrase(statusCode);
+	response.headers["Location"] = location;
+	//we don't need a body for redirect responses, so we can leave it empty	or we can set it to a default message	
+	response.body.clear();
+	response.headers["Content-Length"] = "0";
+	return response;
+}
+Response ResponseBuilder::buildNoContentResponse()
+{
+	Response response;
+	response.version = "HTTP/1.1";
+	response.statusCode = 204;
+	response.reasonPhrase = getReasonPhrase(204);
+	response.body.clear();
+	response.headers["Content-Length"] = "0";
+	return response;
+}
+Response ResponseBuilder::buildCreatedResponse(const std::string& location)
+{
+	Response response;
+
+	response.version = "HTTP/1.1";
+	response.statusCode = 201;
+	response.reasonPhrase = getReasonPhrase(201);
+	response.body.clear();
+
+	response.headers["Location"] = location;
+	response.headers["Content-Length"] = "0";
+
+	return response;
+}
+
+Response ResponseBuilder::buildListingResponse(const std::vector<std::string>& list, const std::string& requestPath)
+{
+	Response response;
+
+	response.version = "HTTP/1.1";
+	response.statusCode = 200;
+	response.reasonPhrase = getReasonPhrase(200);
+
+	std::string body;
+
+	body += "<!DOCTYPE html>\n";
+	body += "<html>\n";
+	body += "<head>\n";
+	body += "<title>Index of ";
+	body += requestPath;
+	body += "</title>\n";
+	body += "</head>\n";
+	body += "<body>\n";
+	body += "<h1>Index of ";
+	body += requestPath;
+	body += "</h1>\n";
+	body += "<ul>\n";
+
+	for (size_t i = 0; i < list.size(); ++i)
+	{
+		body += "<li><a href=\"";
+
+		if (!requestPath.empty() && requestPath[requestPath.size() - 1] != '/')
 		{
-			response.headers["Content-Length"] = std::to_string(response.body.size());
-			return response;
+			body += requestPath;
+			body += "/";
 		}
 		else
-		{
-			response.body = "<html><body><h1>500 Internal Server Error</h1></body></html>";
-			response.headers["Content-Length"] = std::to_string(response.body.size());
-			return response;
-		}
+			body += requestPath;
+
+		body += list[i];
+		body += "\">";
+		body += list[i];
+		body += "</a></li>\n";
 	}
+
+	body += "</ul>\n";
+	body += "</body>\n";
+	body += "</html>\n";
+
+	response.body = body;
+
+	response.headers["Content-Type"] = "text/html";
+	response.headers["Content-Length"] = std::to_string(response.body.size());
+
+	return response;
 }
