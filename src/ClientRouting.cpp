@@ -87,6 +87,12 @@ bool Client::isURIAllowed(struct stat* buf, std::string path)
 	return true;
 }
 
+void Client::handleErrorResponse(const ServerConfig& sc, HttpStatus code)
+{
+	_request.httpStatus = code;
+	_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), sc);
+}
+
 void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
 {
 	DIR *dir = opendir(fullPath.c_str());
@@ -105,14 +111,12 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 				if (errno != 0)
 				{
 					int saveErr = errno;
-					_request.httpStatus = INTERNAL_SERVER_ERR;
 					if (closedir(dir) == -1)
 					{
 						std::cout << "closedir failed at " << fullPath << std::endl;
 						//Logger::error("closedir failed for " + fullPath + ": " + std::strerror(closeErr));
 					};
-					(void)serverConfig;
-					return ; //_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+					return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 				}
 				break;
 			}
@@ -150,7 +154,7 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 	if (!isURIAllowed(&buf, fullPath))
 	{
 		std::cout << "http status has errors" << std::endl;
-		return ;
+		return handleErrorResponse(sc, _request.httpStatus);
 	}
 
 	if (S_ISDIR(buf.st_mode))
@@ -172,11 +176,10 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 		}
 		if (lc.autoindex)
 		{
-			std::cout << "dir, no index, autoindex on: handleDirListing()"<< std::endl;
-			return ; // handleDirListing(fullPath);
+			std::cout << "dir, no index, autoindex on: handleDirectoryListing()"<< std::endl;
+			return handleDirectoryListing(sc, fullPath);
 		}
-		_request.httpStatus = FORBIDDEN;
-		return ;
+		return handleErrorResponse(sc, FORBIDDEN);
 	}
 
 	if (S_ISREG(buf.st_mode))
@@ -227,10 +230,9 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 	}
 
 	if (!pathAllowed)
-		return ;
+		return handleErrorResponse(sc, _request.httpStatus);
 	
-	_request.httpStatus = FORBIDDEN;
-	return ;
+	return handleErrorResponse(sc, FORBIDDEN);
 }
 
 void Client::routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
@@ -240,14 +242,13 @@ void Client::routingDelete(const ServerConfig& sc, const LocationConfig& lc, std
 	if (!isURIAllowed(&buf, fullPath))
 	{
 		std::cout << "delete, url not allowed" << std::endl;
-		return ;
+		return handleErrorResponse(sc, _request.httpStatus);
 	}
 
 	if (S_ISDIR(buf.st_mode))
 	{
-		_request.httpStatus = FORBIDDEN;
 		std::cout << "delete, paht is dir, forbidden" << std::endl;
-		return ;
+		return handleErrorResponse(sc, FORBIDDEN);
 	}
 
 	std::cout << "delete, regular handleDelete" << std::endl;
@@ -258,7 +259,7 @@ void Client::routing(const ServerConfig& serverConfig)
 {
 	const LocationConfig lc = serverConfig.locations[_locationIndex];
 	if (_request.httpStatus != REQ_OK)
-		return ;
+		return handleErrorResponse(serverConfig, _request.httpStatus);
 
 	if (lc.redirectEnabled)
 		return ; //handleRedirect(lc.redirectStatus, lc.redirectTarget, serverConfig);
@@ -266,8 +267,7 @@ void Client::routing(const ServerConfig& serverConfig)
 	if (!isMethodAllowed(lc, _request.method))
 	{
 		std::cout << "method not allowed: METHODE_NOT_ALLOWED" << std::endl;
-		_request.httpStatus = METHODE_NOT_ALLOWED;
-		return ;
+		return handleErrorResponse(serverConfig, METHODE_NOT_ALLOWED);
 	}
 
 	std::string fullPath = getCorrectFullPath(serverConfig, lc, _request.path);

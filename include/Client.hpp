@@ -57,6 +57,7 @@ class Client
 		void		routingPost(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
 		void		routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
 
+		void		handleErrorResponse(const ServerConfig& sc, HttpStatus code);
 		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
 		// handleRedirect()
 		// handleStatic()
