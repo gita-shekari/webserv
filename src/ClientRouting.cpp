@@ -111,6 +111,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 						std::cout << "closedir failed at " << fullPath << std::endl;
 						//Logger::error("closedir failed for " + fullPath + ": " + std::strerror(closeErr));
 					};
+					(void)serverConfig;
 					return ; //_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
 				}
 				break;
@@ -123,7 +124,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 		if (closedir(dir) == -1)
 			std::cout << "closedir failed at " << fullPath << std::endl; // change to logger
 		std::cout << "Listing Directory" << std::endl;
-		for (int i = 0; i < list.size(); i++)
+		for (size_t i = 0; i < list.size(); i++)
 			std::cout << list[i] << std::endl;
 		// buildListingResponse(list);
 	}
@@ -137,6 +138,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 		else
 			_request.httpStatus = INTERNAL_SERVER_ERR;
 		std::cout << "opendir erro. status code = " << _request.httpStatus << std::endl;
+		std::cout << "saveErr " << saveErr << std::endl;
 		return ; // buildErrorRepsonse();
 	}
 }
@@ -191,21 +193,10 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 
 void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
 {
-	if (isCGI(lc, fullPath))
-	{
-		std::cout << "post, is cgi. handleCGI()" << std::endl;
-		return ; // handleCGI();
-	}
-
-
 	struct stat buf;
-	if (!isURIAllowed(&buf, fullPath))
-	{
-		std::cout << "post, no upload store, not cgi, not dir or reg." << std::endl;
-		return ; 
-	}
+	bool pathAllowed = isURIAllowed(&buf, fullPath);
 
-	if (S_ISDIR(buf.st_mode))
+	if (pathAllowed && S_ISDIR(buf.st_mode))
 	{
 		if (!_request.path.empty() && _request.path[_request.path.size() - 1] != '/')
 		{
@@ -221,16 +212,25 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 			}
 		}
 	}
-
+	if (pathAllowed && S_ISREG(buf.st_mode))
+	{
+		if (isCGI(lc, fullPath))
+		{
+			std::cout << "post, is cgi. handleCGI()" << std::endl;
+			return ; // handleCGI();
+		}
+	}
 	if (!lc.upload_store.empty())
 	{
 		std::cout << "post, upload to a store. handleUpload()" << std::endl;
 		return ; // handleUpload();
 	}
 
+	if (!pathAllowed)
+		return ;
+	
 	_request.httpStatus = FORBIDDEN;
 	return ;
-
 }
 
 void Client::routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)

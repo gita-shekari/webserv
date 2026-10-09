@@ -1,4 +1,24 @@
-# Routing test fixtures
+# Routing tests
+
+Build and run from the repository root:
+
+```sh
+c++ -Wall -Wextra -Werror -std=c++11 \
+    test_files/test_routing/test_routing.cpp \
+    -o test_files/test_routing/test_routing
+
+./test_files/test_routing/test_routing
+```
+
+The test executable can also be run from `test_files/test_routing`; it detects
+the fixture root in either working directory.
+
+The test program is a standalone routing decision harness. Its handler calls
+record actions (`CGI`, `STATIC`, `UPLOAD`, and so on) instead of executing CGI,
+deleting files, or writing uploads. Keep its routing rules synchronized with
+`src/ClientRouting.cpp` while the production handlers are still unfinished.
+
+## Fixtures
 
 Run the test executable from the repository root so this relative root resolves correctly:
 
@@ -30,4 +50,7 @@ lc.autoindex = true;
 size_t indexToTest = 0;
 ```
 
-The current test main creates one request and one location, so the only valid index is `0`.
+Additional cases cover direct CGI files, non-CGI files in a CGI-enabled
+location, POST creation through `upload_store`, DELETE routing, configured
+redirect priority, method rejection, and a directory whose name ends in
+`.py`.
