@@ -5,36 +5,58 @@
 #include <dirent.h>
 
 // helper
-std::string	toLower(const std::string& str)
+
+bool isMethodAllowed(const LocationConfig& lc, const std::string& method)
 {
-	std::string	ret = str;
-	for (size_t i = 0; i < ret.size(); ++i)
-		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
-	return ret;
+	std::vector<std::string>::const_iterator it = std::find(lc.methods.begin(), lc.methods.end(), method);
+	if (it == lc.methods.end())
+		return false;
+	return true;
+}
+std::string joinPath(const std::string& root, const std::string& path)
+{
+	if (root.empty())
+		return path;
+	if (path.empty())
+		return root;
+	
+	bool rootEndsSlash = root[root.size() - 1] == '/';
+	bool pathStartsSlash = path[0] == '/';
+
+	if (rootEndsSlash && pathStartsSlash)
+		return root + path.substr(1);
+	if (!rootEndsSlash && !pathStartsSlash)
+		return root + "/" + path;
+	return root + path;
 }
 
-bool isCGI(const ServerConfig& serverConfig, const std::string& path)
+std::string getCorrectFullPath(const ServerConfig& sc, const LocationConfig& lc, std::string reqPath)
+{
+	std::string root = sc.root;
+	if (lc.root.size() != 0)
+		root = lc.root;
+	return joinPath(root, reqPath);
+}
+
+bool isCGI(const LocationConfig& lc, const std::string& path)
 {
 	std::string ext;
-	size_t idx = path.size() - 1;
-
-	while (idx >= 0)
-	{
-		if (path[idx] == '.')
-			break;
-		ext += path[idx];
-		idx--;
-	}
-	// TODO: should I make sure idx != 0? because we are sure it won't happen. 
-	std::reverse(ext.begin(), ext.end());
-	if (ext == "py" || ext == "php")
-		return true;
-	else 
+	size_t dot = path.find_last_of('.');
+	size_t slash = path.find_last_of('/');
+	
+	if (dot == std::string::npos)
 		return false;
+	if (slash != std::string::npos && slash > dot)
+		return false;
+	
+	ext = path.substr(dot);
+
+	if (lc.cgiHandlers.find(ext) != lc.cgiHandlers.end())
+		return true;
+	return false;
 }
 
-// this function is a client class util
-bool Client::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
+bool Client::isURIAllowed(struct stat* buf, std::string path)
 {
 	if (stat(path.c_str(), buf) == -1)
 	{
@@ -119,106 +141,143 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 	}
 }
 
-void Client::handleDirectory(const ServerConfig& serverConfig, std::string& fullPath)
+void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
 {
-	const LocationConfig lc = serverConfig.locations[_locationIndex];
+	struct stat buf;
 
-	if (toLower(_request.method) == "get")
+	if (!isURIAllowed(&buf, fullPath))
 	{
+		std::cout << "http status has errors" << std::endl;
+		return ;
+	}
+
+	if (S_ISDIR(buf.st_mode))
+	{
+		if (!_request.path.empty() && _request.path[_request.path.size() - 1] != '/')
+		{
+			std::cout << "redirect get directory no /: code 301" << std::endl;
+			return ; //handleRedirect(301, _request.path + '/', serverConfig)// handle redirect and add / to the end;
+		}
 		if (!lc.index.empty())
 		{
-			if (isCGI(serverConfig, fullPath + lc.index))
+			if (isCGI(lc, joinPath(fullPath, lc.index)))
 			{
-				std::cout << "in handle directory: is CGI going to run cgi" << std::endl;
-				return ;// handleCGI();
+				std::cout << joinPath(fullPath, lc.index) << "handleCGI(joinPath(fullPath, lc.index))" << std::endl;
+				return ;//handleCGI();	
 			}
-			else
-			{
-				std::cout << "in handle direcotyr: not CGI going to run static" << std::endl;
-				return ;//handleStatic()
-			}
+			std::cout << "lc index, handleStatic " << std::endl;
+			return ; //handleStatic();
 		}
-		// index is empty
-		if (!lc.autoindex)
+		if (lc.autoindex)
 		{
-			_request.httpStatus = FORBIDDEN;
-			//_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-			std::cout << "location config has no index and no autoindex" << std::endl;
-			return ;
+			std::cout << "dir, no index, autoindex on: handleDirListing()"<< std::endl;
+			return ; // handleDirListing(fullPath);
 		}
-		else
-			handleDirectoryListing(serverConfig, fullPath);
+		_request.httpStatus = FORBIDDEN;
+		return ;
 	}
 
-	// if req method is POST
-	if (toLower(_request.method) == "post")
+	if (S_ISREG(buf.st_mode))
 	{
-		if (!lc.index.empty() && isCGI(serverConfig, fullPath + lc.index))
+		if (isCGI(lc, fullPath))
 		{
-			std::cout << "POST: index is cgi " << std::endl;
-			return ; // handleCGI();
+			std::cout << "regular get, is cgi. handleCGI" << std::endl;
+			return ; //handleCGI();
 		}
-		if (!lc.upload_store.empty())
+		std::cout << "regular not cgi. handleStacit" << std::endl;
+		return ; // handleStatic();
+	}
+}
+
+void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
+{
+	if (isCGI(lc, fullPath))
+	{
+		std::cout << "post, is cgi. handleCGI()" << std::endl;
+		return ; // handleCGI();
+	}
+
+
+	struct stat buf;
+	if (!isURIAllowed(&buf, fullPath))
+	{
+		std::cout << "post, no upload store, not cgi, not dir or reg." << std::endl;
+		return ; 
+	}
+
+	if (S_ISDIR(buf.st_mode))
+	{
+		if (!_request.path.empty() && _request.path[_request.path.size() - 1] != '/')
 		{
-			return ;//handleUpload();
+			std::cout << "redirect post directory no /: code 307" << std::endl;
+			return ; //handleRedirect(307, _request.path + '/', serverConfig)// handle redirect and add / to the end;
 		}
-		else
+		if (!lc.index.empty())
 		{
-			_request.httpStatus = FORBIDDEN;
-			return ; // buildErrorReponse();
+			if (isCGI(lc, joinPath(fullPath, lc.index)))
+			{
+				std::cout << "post, path is direc, add index is cgi. handleCGI()" << std::endl;
+				return ; // handleCGI();
+			}
 		}
 	}
-	// if req method is DELETE
-	if (toLower(_request.method) == "delete")
+
+	if (!lc.upload_store.empty())
+	{
+		std::cout << "post, upload to a store. handleUpload()" << std::endl;
+		return ; // handleUpload();
+	}
+
+	_request.httpStatus = FORBIDDEN;
+	return ;
+
+}
+
+void Client::routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
+{
+	struct stat buf;
+
+	if (!isURIAllowed(&buf, fullPath))
+	{
+		std::cout << "delete, url not allowed" << std::endl;
+		return ;
+	}
+
+	if (S_ISDIR(buf.st_mode))
 	{
 		_request.httpStatus = FORBIDDEN;
-		return ; // buildErrorReponse();
+		std::cout << "delete, paht is dir, forbidden" << std::endl;
+		return ;
 	}
+
+	std::cout << "delete, regular handleDelete" << std::endl;
+	return ; // handleDelete();
 }
 
 void Client::routing(const ServerConfig& serverConfig)
 {
-	std::string root = serverConfig.root;
 	const LocationConfig lc = serverConfig.locations[_locationIndex];
-	if (lc.root.size() != 0)
-		root = lc.root;
-	std::string filesystemPath = root + _request.path;
-	std::cout << "file path: " + filesystemPath << std::endl;
-	struct stat buf;
-	std::vector<std::string>::const_iterator it = std::find(lc.methods.begin(), lc.methods.end(), toLower(_request.method));
-	if (it == lc.methods.end())
-		_request.httpStatus = METHODE_NOT_ALLOWED;
-	if(_request.httpStatus != REQ_OK || !isURIAllowed(serverConfig, &buf, filesystemPath))
-	{
-		//_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-		std::cout << "http status is has errors" << std::endl;
+	if (_request.httpStatus != REQ_OK)
 		return ;
-	}			
 
-	if (S_ISDIR(buf.st_mode))
+	if (lc.redirectEnabled)
+		return ; //handleRedirect(lc.redirectStatus, lc.redirectTarget, serverConfig);
+
+	if (!isMethodAllowed(lc, _request.method))
 	{
-		// TODO: make sure request.path will never be empty()
-		if (!_request.path.empty() && _request.path[_request.path.size() - 1] == '/')
-		{
-			return handleDirectory(serverConfig, filesystemPath);// handle directory
-		}
-		else
-		{
-			std::cout << "coming soon: handleRedirect(301)" << std::endl;
-			return ; //handleRedirect(301, _request.path + '/', serverConfig)// handle redirect and add / to the end;
-		}
+		std::cout << "method not allowed: METHODE_NOT_ALLOWED" << std::endl;
+		_request.httpStatus = METHODE_NOT_ALLOWED;
+		return ;
 	}
-	if (S_ISREG(buf.st_mode))
-	{
-		if (isCGI(serverConfig, _request.path))
-		{
-			std::cout << "is CGI going to run cgi" << std::endl;
-			// handleCGI();
-		}
-		else
-		{
-			std::cout << " is static going ot run static" << std::endl;
-			// handleStatic();
-		}
-	}
+
+	std::string fullPath = getCorrectFullPath(serverConfig, lc, _request.path);
+
+	if (_request.method == "GET")
+		return routingGet(serverConfig, lc, fullPath);
+	
+	if (_request.method == "POST")
+		return routingPost(serverConfig, lc, fullPath);
+	
+	if (_request.method == "DELETE")
+		return routingDelete(serverConfig, lc, fullPath);
 }

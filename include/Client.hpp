@@ -44,18 +44,19 @@ class Client
 		void		disConnected(void);
 
 		// client util
-		bool		isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path);
+		bool		isURIAllowed(struct stat* buf, std::string path);
 		
 		// for request processing
 		void		appendReadBuffer(const char *data, size_t size);
 		ParseStatus	parseReadBuffer(void);
 		void		matchLocation(const std::vector<LocationConfig>& location);
-		void 		routing(const ServerConfig& serverConfig);
 
 		// handle routings
-		void		handleDirectory(const ServerConfig& ServerConfig, std::string& fullPath);
 		void 		routing(const ServerConfig& serverConfig);
-		
+		void		routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
+		void		routingPost(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
+		void		routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
+
 		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
 		// handleRedirect()
 		// handleStatic()

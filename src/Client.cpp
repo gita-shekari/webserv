@@ -38,11 +38,6 @@ size_t	Client::getEffectiveMaxBodySize(void) const
 	return _request.effectiveMaxBodySize;
 }
 
-size_t	Client::getLocationIndex(void) const
-{
-	return _locationIndex;
-}
-
 bool	Client::getIsConnected(void)
 {
 	return _isConnected;

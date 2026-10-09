@@ -4,6 +4,14 @@
 #include <cctype>
 #include <limits>
 
+std::string	toUpper(const std::string& str)
+{
+	std::string	ret = str;
+	for (size_t i = 0; i < ret.size(); ++i)
+		ret[i] = std::toupper(static_cast<unsigned char>(ret[i]));
+	return ret;
+}
+
 ConfigParser::ConfigParser(){}
 
 void ConfigParser::tokenize(std::ifstream& file)
