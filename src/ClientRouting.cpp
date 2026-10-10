@@ -202,7 +202,6 @@ void Client::handleDelete(const ServerConfig& serverConfig, const std::string& f
 
 		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 	}
-
 	_response = _builder.buildNoContentResponse();
 }
 
@@ -405,7 +404,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 			return handleCGI(sc, fullPath);
 		}
 	}
-	if (!lc.upload_store.empty())
+	if (lc.upload_enabled && !lc.upload_store.empty())
 	{
 		std::cout << "post, upload to a store. handleUpload()" << std::endl;
 		return handleUpload(sc, lc);
