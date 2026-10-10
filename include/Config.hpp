@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <map>
 
 #include <map>
 
@@ -14,25 +15,36 @@ struct LocationConfig
 {
 	std::string path;
 	std::vector<std::string> methods;
+
 	std::string root;
 	size_t 		client_max_body_size; 
 	bool 		has_client_max_body_size;
 
 	std::string index;
-	bool 		autoindex = false;
+	bool autoindex = false;
+
+	size_t client_max_body_size = 0;
+	bool has_client_max_body_size = false;
+
+	bool upload_enabled = false;
 	std::string upload_store;
-	std::map<std::string, std::string> cgiHandlers;
-	bool 		redirectEnabled = false;
-	int 		redirectStatus = 0;
-	std::string redirectTarget;
+
+	bool has_redirect = false;
+	int redirect_code = 0;
+	std::string redirect_target;
+
+	std::string cgi_extension;
+	std::string cgi_path;
 };
 
 struct ServerConfig
 {
+	std::string host = "0.0.0.0";
 	int port = 0;
+
 	std::string root;
-	std::string index;
-	std::string error_page = DEFAULT_ERROR_PAGE;
-	size_t		client_max_body_size = DEFAULT_BODY_SIZE; // initialize in case config file don't provide this
+	size_t client_max_body_size = DEFAULT_BODY_SIZE;
+
+	std::map<int, std::string> error_pages;
 	std::vector<LocationConfig> locations;
 };

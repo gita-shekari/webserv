@@ -1,21 +1,32 @@
 #pragma once
 
-#include "Http.hpp"
-#include <string>
-#include <iostream>
-#include <map>
-#include <vector>
-#include <algorithm>
-#include "Config.hpp"
+# include "Http.hpp"
+# include "Config.hpp"
+# include <string>
+# include <iostream>
+# include <map>
+# include <string>
+# include <vector>
+# include <fstream>
+# include <sstream>
 
 class ResponseBuilder
 {
 	public:
-		Response buildResponse(const Request& request, const ServerConfig& serverConfig);
-		Response buildGetResponse(const Request& request, const ServerConfig& serverConfig);
 		Response buildErrorResponse(int statusCode, const ServerConfig& serverConfig);
-		const LocationConfig* findLocation(const std::string& path, const ServerConfig& serverConfig);
+		Response buildStaticResponse(const std::string& filePath, const ServerConfig& serverConfig);
+		Response buildRedirectResponse(int statusCode, const std::string& location);
+		Response buildNoContentResponse();
+		Response buildCreatedResponse(const std::string& location);
+		Response buildListingResponse(const std::vector<std::string>& list, const std::string& requestPath);
 		std::string serialize(const Response& response);
 	private:
+		
+
+		// File/path helpers
+		std::string getRoot(const ServerConfig& serverConfig, const LocationConfig& location);
+		std::string getIndex(const LocationConfig& location);
 		bool getSource(const std::string& path, std::string& content);
+		std::string getReasonPhrase(int statusCode);
+		std::string getContentType(const std::string& path);
 };

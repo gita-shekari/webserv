@@ -96,16 +96,15 @@ void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 
 		if (length > _request.path.size())
 			continue;
-		
+
 		if (_request.path.compare(0, length, locationPath) != 0)
 			continue;
-		
+
 		bool validBoundary = (length == _request.path.size())
 							|| (locationPath == "/")
 							|| (_request.path[length] == '/');
 		if (!validBoundary)
 			continue;
-		
 		if (length > longestMatch)
 		{
 			longestMatch = length;

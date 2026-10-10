@@ -73,6 +73,15 @@ class Server
 
 		std::map<int, size_t>						_listeners;
 		std::map<int, Client>						_clients;
+
+		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
+
+		bool										_isRunning;
+		const std::vector<struct ServerConfig>& 	_config;
+		std::vector<struct pollfd>					_pollfds;
+
+		std::map<int, size_t>						_listeners;
+		std::map<int, Client>						_clients;
 		
 		Server(void);
 };

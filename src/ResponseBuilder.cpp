@@ -29,25 +29,7 @@ std::string ResponseBuilder::serialize(const Response& response)
 	res += response.body;
 	return res;
 }
-// Request.method
-//     ↓
-// used to DECIDE what to do
 
-// Request.path
-//     ↓
-// used to DECIDE which resource is requested
-
-// Request.version
-//     ↓
-// may influence protocol handling
-
-// Request.headers
-//     ↓
-// some may influence response behavior
-
-// Request.body
-//     ↓
-// important especially for POST
 bool ResponseBuilder::getSource(const std::string& path, std::string& content)
 {
 	std::ifstream src(path.c_str());
@@ -58,154 +40,180 @@ bool ResponseBuilder::getSource(const std::string& path, std::string& content)
 	content = buffer.str();
 	return true;
 }
-const LocationConfig* ResponseBuilder::findLocation(const std::string& path, const ServerConfig& serverConfig)
+std::string ResponseBuilder::getContentType(const std::string& path)
 {
-	std::vector<LocationConfig>::const_iterator it;
-	for(it = serverConfig.locations.begin(); it != serverConfig.locations.end(); it++)
-	{
-		if(it->path == path) // exact same path. but we need the most matched one. path.compare() and be aware of boundray. 
-			return &(*it);
-	}
-	return NULL;
+	size_t dotPos = path.find_last_of('.');
+	if(dotPos == std::string::npos)
+		return "application/octet-stream";
+	std::string extension = path.substr(dotPos + 1);
+	if(extension == "html" || extension == "htm")
+		return "text/html";
+	else if(extension == "css")
+		return "text/css";
+	else if(extension == "js")
+		return "application/javascript";
+	else if(extension == "json")
+		return "application/json";
+	else if(extension == "png")
+		return "image/png";
+	else if(extension == "jpg" || extension == "jpeg")
+		return "image/jpeg";
+	else if(extension == "gif")
+		return "image/gif";
+	else if(extension == "txt")
+		return "text/plain";
+	else
+		return "application/octet-stream";
 }
-Response ResponseBuilder::buildGetResponse(const Request& request, const ServerConfig& serverConfig)
+std::string ResponseBuilder::getReasonPhrase(int statusCode)
 {
-	Response response;
-	response.version = "HTTP/1.1";
-
-	const LocationConfig *location = findLocation(request.path, serverConfig);
-	if (location == NULL)
+	switch(statusCode)
 	{
-		response.statusCode = 404;
-		response.reasonPhrase = "Not Found";
-		response.body = "Not Found";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] = std::to_string(response.body.size());
-		return response;
+		case 200: return "OK";
+		case 201: return "Created";
+		case 204: return "No Content";
+		case 301: return "Moved Permanently";
+		case 302: return "Found";
+		case 400: return "Bad Request";
+		case 403: return "Forbidden";
+		case 404: return "Not Found";
+		case 405: return "Method Not Allowed";
+		case 413: return "Payload Too Large";
+		case 500: return "Internal Server Error";
+		default: return "Unknown Status Code";
 	}
-	// 1. Check GET is allowed
-	bool getAllowed = false;
-	std::vector<std::string>::const_iterator it;
-	for (it = location->methods.begin();
-		 it != location->methods.end();
-		 ++it)
-	{
-		if (*it == "GET")
-		{
-			getAllowed = true;
-			break;
-		}
-	}
-	if (!getAllowed)
-	{
-		response.statusCode = 405;
-		response.reasonPhrase = "Method Not Allowed";
-		response.body = "Method Not Allowed";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] =
-			std::to_string(response.body.size());
-		return response;
-	}
-	// 2. Resolve root
-	std::string root;
-
-	if (!location->root.empty())
-		root = location->root;
-	else
-		root = serverConfig.root;
-	// 3. Resolve index
-	std::string index;
-	if (!location->index.empty())
-		index = location->index;
-	else
-		index = serverConfig.index;
-	std::string filePath;
-	if (request.path == "/")
-		filePath = root + "/" + index;
-	else
-		filePath = root + request.path;
-	// 4. Read file
-	std::string content;
-	if (!getSource(filePath, content))
-	{
-		response.statusCode = 404;
-		response.reasonPhrase = "Not Found";
-		response.body = "Not Found";
-		response.headers["Content-Type"] = "text/plain";
-		response.headers["Content-Length"] =
-			std::to_string(response.body.size());
-		return response;
-	}
-	// 5. Happy response
-	response.statusCode = 200;
-	response.reasonPhrase = "OK";
-	response.body = content;
-	response.headers["Content-Type"] = "text/html";
-	response.headers["Content-Length"] =
-		std::to_string(response.body.size());
-	return response;
 }
-//enum	HttpStatus
-//{
-//	REQ_OK = 200,
-//	BAD_REQ = 400,
-//	PAGE_NOT_FOUND = 404,
-//	METHODE_NOT_ALLOWED = 405,
-//	PLAYLOAD_TOO_LARGE = 413,
-// 	INTERNAL_SERVER_ERR = 500,
-//	NOT_IMPLEMENTED = 501,
-//	HTTP_VERSION_NOT_NSUP = 505
-//};
-
 Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig& serverConfig)
 {
 	Response response;
-
-	response.version = "HTTP/1.1";
 	response.statusCode = statusCode;
-
-	if (statusCode == 400)
-		response.reasonPhrase = "Bad Request";
-	else if (statusCode == 404)
-		response.reasonPhrase = "Not Found";
-	else if (statusCode == 405)
-		response.reasonPhrase = "Method Not Allowed";
-	else if (statusCode == 413)
-		response.reasonPhrase = "Payload Too Large";
-	else if (statusCode == 501)
-		response.reasonPhrase = "Not Implemented";
-	else if (statusCode == 505)
-		response.reasonPhrase = "HTTP Version Not Supported";
+	response.reasonPhrase = getReasonPhrase(statusCode);
+	response.version = "HTTP/1.1";
+	response.headers["Content-Type"] = "text/html";
+	std::map<int, std::string>::const_iterator it = serverConfig.error_pages.find(statusCode);
+	if(it != serverConfig.error_pages.end())
+	{
+		std::string errorPagePath = serverConfig.root + "/" + it->second;
+		if(getSource(errorPagePath, response.body))
+		{
+			response.headers["Content-Length"] = std::to_string(response.body.size());
+			return response;
+		}
+	}
+	response.statusCode = 500;
+	response.reasonPhrase = getReasonPhrase(500);
+	if(getSource(serverConfig.root + "/500.html", response.body))
+	{
+		response.headers["Content-Length"] = std::to_string(response.body.size());
+		return response;
+	}
 	else
 	{
-		response.statusCode = 500;
-		response.reasonPhrase = "Internal Server Error";
+		response.body = "<html><body><h1>500 Internal Server Error</h1></body></html>";
+		response.headers["Content-Length"] = std::to_string(response.body.size());
+		return response;
 	}
-	std::string path = serverConfig.root + "/" + serverConfig.error_page;
-	if (!getSource(path, response.body))
-	{
-		response.body = "<html><body><h1>Error</h1></body></html>";
-	}
-	response.headers["Content-Type"] = "text/html";
+}
+
+Response ResponseBuilder::buildStaticResponse(const std::string& filePath, const ServerConfig& serverConfig)
+{
+	Response response;
+	if (!getSource(filePath, response.body))
+		return buildErrorResponse(404, serverConfig);
+	response.version = "HTTP/1.1";
+	response.statusCode = 200;
+	response.reasonPhrase = getReasonPhrase(200);
+	response.headers["Content-Type"] = getContentType(filePath);
 	response.headers["Content-Length"] = std::to_string(response.body.size());
 	return response;
 }
-Response ResponseBuilder::buildResponse(const Request& request, const ServerConfig& serverConfig)
+
+Response ResponseBuilder::buildRedirectResponse(int statusCode, const std::string& location)
 {
+	Response response;
+	response.version = "HTTP/1.1";
+	response.statusCode = statusCode;
+	response.reasonPhrase = getReasonPhrase(statusCode);
+	response.headers["Location"] = location;
+	//we don't need a body for redirect responses, so we can leave it empty	or we can set it to a default message	
+	response.body.clear();
+	response.headers["Content-Length"] = "0";
+	return response;
+}
+Response ResponseBuilder::buildNoContentResponse()
+{
+	Response response;
+	response.version = "HTTP/1.1";
+	response.statusCode = 204;
+	response.reasonPhrase = getReasonPhrase(204);
+	response.body.clear();
+	response.headers["Content-Length"] = "0";
+	return response;
+}
+Response ResponseBuilder::buildCreatedResponse(const std::string& location)
+{
+	Response response;
 
-	//if(request.method == "GET")
-	//{
-		return (buildGetResponse(request, serverConfig));
-	//}
-	// else if(request.method == "POST")
-	// {
+	response.version = "HTTP/1.1";
+	response.statusCode = 201;
+	response.reasonPhrase = getReasonPhrase(201);
+	response.body.clear();
 
-	// }
-	// else if(request.method == "DELETE")
-	// {
+	response.headers["Location"] = location;
+	response.headers["Content-Length"] = "0";
 
-	// }
-
-	//return (buildErrorResponse(static_cast<int>(request.httpStatus)), serverConfig);
+	return response;
 }
 
+Response ResponseBuilder::buildListingResponse(const std::vector<std::string>& list, const std::string& requestPath)
+{
+	Response response;
+
+	response.version = "HTTP/1.1";
+	response.statusCode = 200;
+	response.reasonPhrase = getReasonPhrase(200);
+
+	std::string body;
+
+	body += "<!DOCTYPE html>\n";
+	body += "<html>\n";
+	body += "<head>\n";
+	body += "<title>Index of ";
+	body += requestPath;
+	body += "</title>\n";
+	body += "</head>\n";
+	body += "<body>\n";
+	body += "<h1>Index of ";
+	body += requestPath;
+	body += "</h1>\n";
+	body += "<ul>\n";
+
+	for (size_t i = 0; i < list.size(); ++i)
+	{
+		body += "<li><a href=\"";
+
+		if (!requestPath.empty() && requestPath[requestPath.size() - 1] != '/')
+		{
+			body += requestPath;
+			body += "/";
+		}
+		else
+			body += requestPath;
+
+		body += list[i];
+		body += "\">";
+		body += list[i];
+		body += "</a></li>\n";
+	}
+
+	body += "</ul>\n";
+	body += "</body>\n";
+	body += "</html>\n";
+
+	response.body = body;
+
+	response.headers["Content-Type"] = "text/html";
+	response.headers["Content-Length"] = std::to_string(response.body.size());
+
+	return response;
+}

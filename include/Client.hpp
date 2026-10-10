@@ -59,11 +59,12 @@ class Client
 
 		void		handleErrorResponse(const ServerConfig& sc, HttpStatus code);
 		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
-		// handleRedirect()
-		// handleStatic()
-		// handleCGI()
-
-		// for timer
+		void handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath);
+		void handleStatic(const ServerConfig& serverConfig, const std::string& filePath);
+		void handleRedirect(int code, const std::string& redirURI);
+		void handleDelete(const ServerConfig& serverConfig, const std::string& filePath);
+		void handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc);
+		
 		void		updateLastActivity(void);
 
 	private:

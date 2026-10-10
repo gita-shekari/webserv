@@ -14,8 +14,7 @@
 #include <cerrno>
 
 Server::Server(const std::vector<ServerConfig>& config)
-	: _isRunning(false),
-	  _config(config)
+	: _config(config)
 {
 	Logger::debug("server object created");
 }
@@ -75,7 +74,6 @@ void	Server::runningLoop(void)
 
 		if (res > 0)
 		{
-			
 			for (size_t i = 0; i < polledFdCount; i++)
 			{
 				short revents = _pollfds[i].revents;
@@ -376,7 +374,7 @@ void	Server::acceptNewClient(int listenerFd)
 	while (acceptedCount < MAX_ACCEPTS_PER_EVENT)
 	{
 		int clientFd = accept(listenerFd, NULL, NULL);
-		
+
 		if (clientFd == -1)
 		{
 			const int errorNumber = errno;
@@ -386,7 +384,7 @@ void	Server::acceptNewClient(int listenerFd)
 			{
 				Logger::debug("accept interrupted; retrying");
 				continue;
-			}			
+			}
 			if (errorNumber == EMFILE || errorNumber == ENFILE)
 			{
 				Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
@@ -449,7 +447,6 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 		{
 			it->second.matchLocation(serverConfig.locations);
 			size_t	locationIndex = it->second.getLocationIndex();
-			
 			if (locationIndex != static_cast<size_t>(-1))
 			{
 				const LocationConfig& location = serverConfig.locations[locationIndex];
