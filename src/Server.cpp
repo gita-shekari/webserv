@@ -518,7 +518,7 @@ bool	Server::sendClientData(Client& client)
 	{
 		client.updateLastActivity();	
 		client.setWriteOffSet(bytesSent);
-		if (client.getWriteOffSet() == buffer.size())
+		if (static_cast<size_t>(client.getWriteOffSet()) == buffer.size())
 			return true;
 		return false;
 	}

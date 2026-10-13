@@ -8,8 +8,9 @@ Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
 	  _serverIndex(serverIndex),
 	  _isConnected(true),
-	  _lastActivity(std::chrono::steady_clock::now()),
-	  _writeOffSet(0)
+	  _writeOffSet(0),
+	  _lastActivity(std::chrono::steady_clock::now())
+	  
 {
 	std::cout << "A client is created fd: " << fd << std::endl;
 }
