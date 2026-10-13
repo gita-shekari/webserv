@@ -44,23 +44,27 @@ class Client
 		void		disConnected(void);
 
 		// client util
-		bool		isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path);
+		bool		isURIAllowed(struct stat* buf, std::string path);
 
 		// for request processing
 		void		appendReadBuffer(const char *data, size_t size);
 		ParseStatus	parseReadBuffer(void);
 		void		matchLocation(const std::vector<LocationConfig>& location);
-		
 
 		// handle routings
+		void 		routing(const ServerConfig& serverConfig);
+		void		routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
+		void		routingPost(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
+		void		routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath);
+
+		void		handleErrorResponse(const ServerConfig& sc, HttpStatus code);
+		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
 		void handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath);
 		void handleStatic(const ServerConfig& serverConfig, const std::string& filePath);
-		void handleRedirect(int code, const std::string& location);
+		void handleRedirect(int code, const std::string& redirURI);
 		void handleDelete(const ServerConfig& serverConfig, const std::string& filePath);
 		void handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc);
-		void handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
-		void handleDirectory(const ServerConfig& serverConfig, std::string& fullPath);
-		void routing(const ServerConfig& serverConfig);
+
 		void		updateLastActivity(void);
 
 	private:
