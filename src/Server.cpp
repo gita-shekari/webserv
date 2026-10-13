@@ -54,6 +54,18 @@ bool Server::getRunning(void)
 	return this->_isRunning;
 }
 
+Client& Server::getClient(int clientFd)
+{
+	std::map<int, Client>::iterator it = _clients.find(clientFd);
+	if (it == _clients.end())
+	{
+		Logger::fatal("event registry invariant violated: poll fd="
+			+ std::to_string(clientFd) + " has no Client");
+		throw ServerException();
+	}
+	return (it->second);
+}
+
 void	Server::runningLoop(void)
 {
 	int	eagainCount = 0;
@@ -96,17 +108,11 @@ void	Server::runningLoop(void)
 
 				if (revents & POLLIN)
 				{
-					std::map<int, Client>::iterator it = _clients.find(fd);
-					if (it == _clients.end())
-					{
-						Logger::fatal("event registry invariant violated: poll fd="
-							+ std::to_string(fd) + " has no Client");
-						throw ServerException();
-					}
-					if (!receiveClientData(fd, it)) // _config[it->second.getServerIndex()]
+					Client& client = getClient(fd);
+					if (!receiveClientData(fd, client))
 						continue;
 					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
-					it->second.routing(_config[it->second.getServerIndex()]);
+					client.routing(_config[client.getServerIndex()]);
 					
 					_pollfds[i].events |= POLLOUT;
 					//CGI processing
@@ -114,7 +120,8 @@ void	Server::runningLoop(void)
 
 				if (revents & POLLOUT)
 				{
-					if (sendClientData(fd))
+					Client& client = getClient(fd);
+					if (sendClientData(client))
 					{
 						_pollfds[i].events &= ~POLLOUT;
 						// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
@@ -422,8 +429,8 @@ bool	Server::isClientFd(int fd) const
 	return _clients.find(fd) != _clients.end();
 }
 
-template <typename ClientsIt>
-bool	Server::receiveClientData(int fd, ClientsIt it)
+
+bool	Server::receiveClientData(int fd, Client& client)
 {
 	char buffer[1024];
 
@@ -431,32 +438,32 @@ bool	Server::receiveClientData(int fd, ClientsIt it)
 
 	if (bytesReceived > 0)
 	{
-		it->second.updateLastActivity();
+		client.updateLastActivity();
 		Logger::debug("received client data: fd=" + std::to_string(fd)
 			+ " bytes=" + std::to_string(bytesReceived));
 
-		it->second.appendReadBuffer(buffer, static_cast<size_t>(bytesReceived));
+		client.appendReadBuffer(buffer, static_cast<size_t>(bytesReceived));
 
-		const ServerConfig& serverConfig = _config[it->second.getServerIndex()];
+		const ServerConfig& serverConfig = _config[client.getServerIndex()];
 
 		//set server-level default only once for this request
-		if (it->second.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
-			it->second.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
+		if (client.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
+			client.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
 
-		ParseStatus status = it->second.parseReadBuffer();
+		ParseStatus status = client.parseReadBuffer();
 
 		if (status == NEED_LOCATION)
 		{
-			it->second.matchLocation(serverConfig.locations);
-			size_t	locationIndex = it->second.getLocationIndex();
+			client.matchLocation(serverConfig.locations);
+			size_t	locationIndex = client.getLocationIndex();
 			if (locationIndex != static_cast<size_t>(-1))
 			{
 				const LocationConfig& location = serverConfig.locations[locationIndex];
 				//update maxBodySize to location config level
 				if (location.has_client_max_body_size)
-					it->second.setEffectiveMaxBodySize(location.client_max_body_size);
+					client.setEffectiveMaxBodySize(location.client_max_body_size);
 			}
-			status = it->second.parseReadBuffer();
+			status = client.parseReadBuffer();
 		}
 		if (status == INCOMPLETE)
 			return false;
@@ -494,38 +501,26 @@ void	Server::markForClose(int fd)
 	Logger::debug("marking client for close: fd=" + std::to_string(fd));
 	// shouldn't do this because it might create a client if it doent exist;
 	//_clients[fd].Client::disConnected();
-
-	std::map<int, Client>::iterator it = _clients.find(fd);
-	if (it != _clients.end())
-	{
-		it->second.disConnected();
-	}
-	else
-	{
-		Logger::fatal("client registry invariant violated: cannot close unknown fd="
-			+ std::to_string(fd));
-		throw ServerException();
-	}
+	Client& client = getClient(fd);
+	client.disConnected();
 }
 
-bool	Server::sendClientData(int fd)
+bool	Server::sendClientData(Client& client)
 {
-	Logger::debug("response ready to send: fd=" + std::to_string(fd));
-	std::map<int, Client>::iterator it = _clients.find(fd);
-	if(it == _clients.end())
-		return false;
+	Logger::debug("response ready to send: fd=" + std::to_string(client.getFd()));
+	
 	// also need to remove from pollfds and another things.
 	// if (fd < 0) // if finish sending the data, then return true.
 	// 	return false;
 	// else
 	// 	return true;
-	const std::string &buffer = it->second.getWriteBuffer();
-	ssize_t bytesSent = send(fd,buffer.c_str(), buffer.size(),0);
+	const std::string &buffer = client.getWriteBuffer();
+	ssize_t bytesSent = send(client.getFd(), buffer.c_str(), buffer.size(),0);
 	if (bytesSent > 0)
-		it->second.updateLastActivity();
+		client.updateLastActivity();
 	if (bytesSent < 0)
 		return false;
-		return true;
+	return true;
 }
 
 void	Server::removeCloseClient(void)

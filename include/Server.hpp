@@ -30,6 +30,7 @@ class Server
 
 		//getters
 		bool	getRunning(void);
+		Client& getClient(int clientFd);
 
 		// system methods
 		void	runningLoop(void);
@@ -47,10 +48,9 @@ class Server
 		// for client fd
 		void	acceptNewClient(int listenerFd);
 		bool	isClientFd(int fd) const;
-		template <typename ClientsIt>
-		bool	receiveClientData(int fd, ClientsIt it);
+		bool	receiveClientData(int fd, Client& client);
 		void	markForClose(int fd);
-		bool	sendClientData(int fd);
+		bool	sendClientData(Client& client);
 		void	removeCloseClient();
 
 		// for timeout
