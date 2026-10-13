@@ -17,8 +17,6 @@ struct LocationConfig
 	std::vector<std::string> methods;
 
 	std::string root;
-	size_t 		client_max_body_size; 
-	bool 		has_client_max_body_size;
 
 	std::string index;
 	bool autoindex = false;

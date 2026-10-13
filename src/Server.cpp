@@ -61,6 +61,8 @@ void	Server::runningLoop(void)
 	while (_isRunning)
 	{
 		const size_t polledFdCount = _pollfds.size(); 
+		if (polledFdCount == 0)
+			continue;
 		// because the size might change since accpet new fds push back in to _pollfds;
 		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
 

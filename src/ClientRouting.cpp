@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include "Logger.hpp"
 
 // helper
 
@@ -119,8 +120,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 					int saveErr = errno;
 					if (closedir(dir) == -1)
 					{
-						std::cout << "closedir failed at " << fullPath << std::endl;
-						//Logger::error("closedir failed for " + fullPath + ": " + std::strerror(closeErr));
+						Logger::error("closedir failed for " + fullPath + ": " + std::strerror(saveErr));
 					};
 					return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 				}
@@ -256,81 +256,6 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 	_response = _builder.buildCreatedResponse(_request.path + name.str());
 }
 
-void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
-{
-	DIR* dir = opendir(fullPath.c_str());
-
-	if (dir != NULL)
-	{
-		std::vector<std::string> list;
-		struct dirent* ent;
-
-		while (true)
-		{
-			errno = 0;
-			ent = readdir(dir);
-
-			if (ent == NULL)
-			{
-				if (errno != 0)
-				{
-					_request.httpStatus = INTERNAL_SERVER_ERR;
-
-					if (closedir(dir) == -1)
-						std::cout << "closedir failed at " << fullPath << std::endl;
-
-					_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-					return;
-				}
-
-				break;
-			}
-
-			std::string name(ent->d_name);
-
-			if (!name.empty() && name[0] == '.')
-				continue;
-
-			struct stat entBuf;
-			std::string entryPath = fullPath;
-
-			if (!entryPath.empty() && entryPath[entryPath.size() - 1] != '/')
-				entryPath += '/';
-
-			entryPath += name;
-
-			if (stat(entryPath.c_str(), &entBuf) == 0 && S_ISDIR(entBuf.st_mode))
-				name += "/";
-
-			list.push_back(name);
-		}
-
-		if (closedir(dir) == -1)
-			std::cout << "closedir failed at " << fullPath << std::endl;
-
-		std::sort(list.begin(), list.end());
-
-		std::cout << "Listing Directory" << std::endl;
-
-		for (size_t i = 0; i < list.size(); ++i)
-			std::cout << list[i] << std::endl;
-
-		_response = _builder.buildListingResponse(list, _request.path);
-		return;
-	}
-
-	int saveErr = errno;
-
-	if (saveErr == EACCES || saveErr == ELOOP)
-		_request.httpStatus = FORBIDDEN;
-	else if (saveErr == ENOENT || saveErr == ENOTDIR)
-		_request.httpStatus = PAGE_NOT_FOUND;
-	else
-		_request.httpStatus = INTERNAL_SERVER_ERR;
-
-	_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-}
-
 void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
 {
 	struct stat buf;
@@ -416,7 +341,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 	return handleErrorResponse(sc, FORBIDDEN);
 }
 
-void Client::routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
+void Client::routingDelete(const ServerConfig& sc, std::string& fullPath)
 {
 	struct stat buf;
 
@@ -460,5 +385,5 @@ void Client::routing(const ServerConfig& serverConfig)
 		return routingPost(serverConfig, lc, fullPath);
 	
 	if (_request.method == "DELETE")
-		return routingDelete(serverConfig, lc, fullPath);
+		return routingDelete(serverConfig, fullPath);
 }
