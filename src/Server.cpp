@@ -109,7 +109,7 @@ void	Server::runningLoop(void)
 				if (revents & POLLIN)
 				{
 					Client& client = getClient(fd);
-					if (!receiveClientData(fd, client))
+					if (!receiveClientData(client))
 						continue;
 					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
 					client.routing(_config[client.getServerIndex()]);
@@ -121,12 +121,11 @@ void	Server::runningLoop(void)
 				if (revents & POLLOUT)
 				{
 					Client& client = getClient(fd);
-					if (sendClientData(client))
-					{
-						_pollfds[i].events &= ~POLLOUT;
-						// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
-						// if request.headers contains "connection" and "close", mark fd close
-					}
+					if (!sendClientData(client))
+						continue;
+					_pollfds[i].events &= ~POLLOUT;
+					// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
+					// if request.headers contains "connection" and "close", mark fd close
 				}
 			}
 		}
@@ -138,28 +137,28 @@ void	Server::runningLoop(void)
 
 void	Server::handlePollCallError(int& eagainCount)
 {
-	const int errorNumber = errno;
+	const int saveErr = errno;
 
-	if (errorNumber == EINTR)
+	if (saveErr == EINTR)
 	{
 		Logger::debug("poll interrupted; retrying");
 		return;
 	}
 
-	if (errorNumber == EAGAIN || errorNumber == ENOMEM)
+	if (saveErr == EAGAIN || saveErr == ENOMEM)
 	{
 		if (eagainCount > 2)
 		{
 			Logger::systemError(Logger::FATAL,
-				"poll: resource exhaustion after retries", errorNumber);
+				"poll: resource exhaustion after retries", saveErr);
 			throw ServerException();
 		}
 		eagainCount++;
 		Logger::systemError(Logger::WARNING,
-			"poll: temporary resource exhaustion; retrying", errorNumber);
+			"poll: temporary resource exhaustion; retrying", saveErr);
 		return;
 	}
-	Logger::systemError(Logger::FATAL, "poll failed", errorNumber);
+	Logger::systemError(Logger::FATAL, "poll failed", saveErr);
 	throw ServerException();
 }
 
@@ -226,22 +225,22 @@ bool	Server::setNonBlocking(int fd)
 
 	if (flags == -1)
 	{
-		const int	errorNumber = errno;
+		const int	saveErr = errno;
 		Logger::systemError(
 			Logger::ERROR,
 			"fcntl F_GETFL failed",
-			errorNumber
+			saveErr
 		);
 		return false;
 	}
 
 	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
 	{
-		const int	errorNumber = errno;
+		const int	saveErr = errno;
 		Logger::systemError(
 			Logger::ERROR,
 			"fcntl F_SETFL O_NONBLOCK failed",
-			errorNumber
+			saveErr
 		);
 		return false;
 	}
@@ -279,8 +278,8 @@ int		Server::createListeningSocket(const ServerConfig& config)
 
 	if (fd == -1)
 	{
-		const int errorNumber = errno;
-		Logger::systemError(Logger::FATAL, "socket creation failed", errorNumber);
+		const int saveErr = errno;
+		Logger::systemError(Logger::FATAL, "socket creation failed", saveErr);
 		/** ERROR TYPES -- for now we only log, not diff them 
 		 * ❌ Invalid Arguments (Configuration Errors)
 		 * EAFNOSUPPORT (Linux) / WSAEAFNOSUPPORT (Windows): The specified address family (e.g., AF_INET, AF_INET6) is not supported by the OS implementation or network stack.
@@ -320,18 +319,18 @@ int		Server::createListeningSocket(const ServerConfig& config)
 
 	if (bind(fd, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1)
 	{
-		const int errorNumber = errno;
-		if (errorNumber == EACCES)
+		const int saveErr = errno;
+		if (saveErr == EACCES)
 		{
-			Logger::systemError(Logger::FATAL, "bind: permission denied", errorNumber);
+			Logger::systemError(Logger::FATAL, "bind: permission denied", saveErr);
 		}
-		else if (errorNumber == EADDRINUSE)
+		else if (saveErr == EADDRINUSE)
 		{
-			Logger::systemError(Logger::FATAL, "bind: address already in use", errorNumber);
+			Logger::systemError(Logger::FATAL, "bind: address already in use", saveErr);
 		}
 		else
 		{
-			Logger::systemError(Logger::FATAL, "bind failed", errorNumber);
+			Logger::systemError(Logger::FATAL, "bind failed", saveErr);
 		}
 		/** OTHER ERRORs : probably won't get. only log if so.
 		 * ❌ EADDRNOTAVAIL / WSAEADDRNOTAVAIL (Cannot assign requested address)
@@ -346,8 +345,8 @@ int		Server::createListeningSocket(const ServerConfig& config)
 	
 	if (listen(fd, 5) == -1)
 	{
-		const int errorNumber = errno;
-		Logger::systemError(Logger::FATAL, "listen failed", errorNumber);
+		const int saveErr = errno;
+		Logger::systemError(Logger::FATAL, "listen failed", saveErr);
 		close(fd);
 		throw ServerException();
 	}
@@ -386,25 +385,25 @@ void	Server::acceptNewClient(int listenerFd)
 
 		if (clientFd == -1)
 		{
-			const int errorNumber = errno;
-			if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+			const int saveErr = errno;
+			if (saveErr == EAGAIN || saveErr == EWOULDBLOCK)
 				return; // no more pending clients in the accept queue
-			if (errorNumber == EINTR)
+			if (saveErr == EINTR)
 			{
 				Logger::debug("accept interrupted; retrying");
 				continue;
 			}
-			if (errorNumber == EMFILE || errorNumber == ENFILE)
+			if (saveErr == EMFILE || saveErr == ENFILE)
 			{
-				Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", errorNumber);
+				Logger::systemError(Logger::ERROR, "accept: file descriptor limit reached", saveErr);
 				return;
 			}
-			if (errorNumber == EBADF || errorNumber == ENOTSOCK)
+			if (saveErr == EBADF || saveErr == ENOTSOCK)
 			{
-				Logger::systemError(Logger::FATAL, "accept: invalid listening socket", errorNumber);
+				Logger::systemError(Logger::FATAL, "accept: invalid listening socket", saveErr);
 				throw ServerException();
 			}
-			Logger::systemError(Logger::WARNING, "accept failed", errorNumber);
+			Logger::systemError(Logger::WARNING, "accept failed", saveErr);
 			return;
 		}
 
@@ -430,10 +429,11 @@ bool	Server::isClientFd(int fd) const
 }
 
 
-bool	Server::receiveClientData(int fd, Client& client)
+bool	Server::receiveClientData(Client& client)
 {
 	char buffer[1024];
 
+	int fd = client.getFd();
 	ssize_t bytesReceived = recv(fd, buffer, sizeof(buffer), 0);
 
 	if (bytesReceived > 0)
@@ -477,19 +477,19 @@ bool	Server::receiveClientData(int fd, Client& client)
 	}
 	else
 	{
-		const int errorNumber = errno;
-		if (errorNumber == EAGAIN || errorNumber == EWOULDBLOCK)
+		const int saveErr = errno;
+		if (saveErr == EAGAIN || saveErr == EWOULDBLOCK)
 			return false;
-		if (errorNumber == ECONNRESET || errorNumber == ETIMEDOUT)
+		if (saveErr == ECONNRESET || saveErr == ETIMEDOUT)
 		{
 			markForClose(fd);
-			Logger::systemError(Logger::INFO, "recv: client connection ended", errorNumber);
+			Logger::systemError(Logger::INFO, "recv: client connection ended", saveErr);
 		}
-		else if (errorNumber == EINTR)
+		else if (saveErr == EINTR)
 			Logger::debug("recv interrupted; retry on the next event");
  		else
 		{
-			Logger::systemError(Logger::ERROR, "recv failed", errorNumber);
+			Logger::systemError(Logger::ERROR, "recv failed", saveErr);
 			markForClose(fd);
 		}
 		return false;
@@ -507,20 +507,30 @@ void	Server::markForClose(int fd)
 
 bool	Server::sendClientData(Client& client)
 {
-	Logger::debug("response ready to send: fd=" + std::to_string(client.getFd()));
-	
-	// also need to remove from pollfds and another things.
-	// if (fd < 0) // if finish sending the data, then return true.
-	// 	return false;
-	// else
-	// 	return true;
+	int fd = client.getFd();
+	Logger::debug("response ready to send: fd=" + std::to_string(fd));
+
 	const std::string &buffer = client.getWriteBuffer();
-	ssize_t bytesSent = send(client.getFd(), buffer.c_str(), buffer.size(),0);
+	const std::string bufferToSend = buffer.data() + client.getWriteOffSet();
+	ssize_t bytesSent = send(fd, bufferToSend.c_str(), bufferToSend.size(), 0);
+
 	if (bytesSent > 0)
-		client.updateLastActivity();
-	if (bytesSent < 0)
+	{
+		client.updateLastActivity();	
+		client.setWriteOffSet(bytesSent);
+		if (client.getWriteOffSet() == buffer.size())
+			return true;
 		return false;
-	return true;
+	}
+	if (bytesSent == -1)
+	{
+		int saveErr = errno;
+		if (saveErr == EAGAIN || saveErr == EWOULDBLOCK || saveErr == EINTR)
+			return false;
+		Logger::systemError(Logger::ERROR, "send failed", saveErr);
+		markForClose(client.getFd());
+	}
+	return false;
 }
 
 void	Server::removeCloseClient(void)

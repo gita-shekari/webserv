@@ -48,7 +48,7 @@ class Server
 		// for client fd
 		void	acceptNewClient(int listenerFd);
 		bool	isClientFd(int fd) const;
-		bool	receiveClientData(int fd, Client& client);
+		bool	receiveClientData(Client& client);
 		void	markForClose(int fd);
 		bool	sendClientData(Client& client);
 		void	removeCloseClient();

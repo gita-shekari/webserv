@@ -8,7 +8,8 @@ Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
 	  _serverIndex(serverIndex),
 	  _isConnected(true),
-	  _lastActivity(std::chrono::steady_clock::now())
+	  _lastActivity(std::chrono::steady_clock::now()),
+	  _writeOffSet(0)
 {
 	std::cout << "A client is created fd: " << fd << std::endl;
 }
@@ -18,7 +19,7 @@ Client::~Client(void)
 	std::cout << "fd " << _fd << " is destroyed" << std::endl;
 }
 
-int		Client::getFd(void)
+int		Client::getFd(void) const
 {
 	return _fd;
 }
@@ -38,17 +39,17 @@ size_t	Client::getEffectiveMaxBodySize(void) const
 	return _request.effectiveMaxBodySize;
 }
 
-bool	Client::getIsConnected(void)
+bool	Client::getIsConnected(void) const
 {
 	return _isConnected;
 }
 
-std::string Client::getWriteBuffer()
+const std::string& Client::getWriteBuffer() const
 {
 	return _writeBuffer;
 }
 
-Request	Client::getReq(void)
+Request	Client::getReq(void) const
 {
 	return _request;
 }

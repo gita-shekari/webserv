@@ -29,19 +29,22 @@ class Client
 		~Client(void);
 
 		//getters
-		int			getFd(void);
+		int			getFd(void) const;
 		size_t		getServerIndex(void) const;
 		size_t		getLocationIndex(void) const;
 		size_t		getEffectiveMaxBodySize(void) const;
-		bool		getIsConnected(void);
-		std::string getWriteBuffer();
-		Request		getReq(void);
+		bool		getIsConnected(void) const;
+		const std::string& getWriteBuffer() const;
+		// no one is using getReq()?
+		Request		getReq(void) const;
 		std::chrono::steady_clock::time_point	getLastActivity(void) const;
+		ssize_t		getWriteOffSet() const;
 
 		// setters
 		void		setRequestPath(const std::string& str); // for testing
 		void		setEffectiveMaxBodySize(size_t size);
 		void		disConnected(void);
+		void		setWriteOffSet(ssize_t byte);
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -74,6 +77,7 @@ class Client
 		bool			_isConnected = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
+		ssize_t			_writeOffSet;
 
 		Request			_request; //current request
 		RequestParser	_parser;
