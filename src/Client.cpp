@@ -10,7 +10,6 @@ Client::Client(int fd, size_t serverIndex)
 	  _isConnected(true),
 	  _writeOffSet(0),
 	  _lastActivity(std::chrono::steady_clock::now())
-	  
 {
 	std::cout << "A client is created fd: " << fd << std::endl;
 }
@@ -53,6 +52,15 @@ const std::string& Client::getWriteBuffer() const
 Request	Client::getReq(void) const
 {
 	return _request;
+}
+ssize_t Client::getWriteOffSet() const
+{
+	return _writeOffSet;
+}
+
+void Client::setWriteOffSet(ssize_t byte)
+{
+	_writeOffSet = byte;
 }
 
 std::chrono::steady_clock::time_point	Client::getLastActivity(void) const

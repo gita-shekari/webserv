@@ -1,5 +1,13 @@
 #include "ConfigParser.hpp"
 
+std::string	toUpper(const std::string& str)
+{
+	std::string	ret = str;
+	for (size_t i = 0; i < ret.size(); ++i)
+		ret[i] = std::toupper(static_cast<unsigned char>(ret[i]));
+	return ret;
+}
+
 ConfigParser::ConfigParser() : _current(0)
 {
 }
@@ -302,13 +310,7 @@ void ConfigParser::parseErrorPage(ServerConfig& sc)
 /* ************************************************************************** */
 /*                           LOCATION DIRECTIVES                              */
 /* ************************************************************************** */
-std::string	Lower(const std::string& str)
-{
-	std::string	ret = str;
-	for (size_t i = 0; i < ret.size(); ++i)
-		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
-	return ret;
-}
+
 void ConfigParser::parseMethods(LocationConfig& lc)
 {
 	expect("methods");
@@ -319,7 +321,7 @@ void ConfigParser::parseMethods(LocationConfig& lc)
 	{
 		if (!isValidMethod(_tokens[_current]))
 			throw std::runtime_error("Invalid HTTP method: " + _tokens[_current]);
-		lc.methods.push_back(Lower(_tokens[_current]));
+		lc.methods.push_back(toUpper((_tokens[_current])));
 		_current++;
 	}
 	expect(";");

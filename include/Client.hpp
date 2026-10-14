@@ -48,7 +48,6 @@ class Client
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
-		
 		// for request processing
 		void		appendReadBuffer(const char *data, size_t size);
 		ParseStatus	parseReadBuffer(void);
@@ -67,7 +66,6 @@ class Client
 		void handleRedirect(int code, const std::string& redirURI);
 		void handleDelete(const ServerConfig& serverConfig, const std::string& filePath);
 		void handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc);
-		
 		void		updateLastActivity(void);
 
 	private:
