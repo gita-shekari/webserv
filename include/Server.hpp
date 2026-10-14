@@ -30,6 +30,7 @@ class Server
 
 		//getters
 		bool	getRunning(void);
+		Client& getClient(int clientFd);
 
 		// system methods
 		void	runningLoop(void);
@@ -47,10 +48,9 @@ class Server
 		// for client fd
 		void	acceptNewClient(int listenerFd);
 		bool	isClientFd(int fd) const;
-		template <typename ClientsIt>
-		bool	receiveClientData(int fd, ClientsIt it);
+		bool	receiveClientData(Client& client);
 		void	markForClose(int fd);
-		bool	sendClientData(int fd);
+		bool	sendClientData(Client& client);
 		void	removeCloseClient();
 
 		// for timeout
@@ -64,7 +64,6 @@ class Server
 	private:
 		static const int	CLIENT_TIMEOUT_SEC = 30;
 		static const int	POLL_TIMEOUT_MS = 1000;
-
 		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
 
 		bool										_isRunning;

@@ -347,9 +347,8 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 	return handleErrorResponse(sc, FORBIDDEN);
 }
 
-void Client::routingDelete(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
+void Client::routingDelete(const ServerConfig& sc, std::string& fullPath)
 {
-	(void)lc;
 	struct stat buf;
 
 	if (!isURIAllowed(&buf, fullPath))
@@ -377,11 +376,11 @@ void Client::routing(const ServerConfig& serverConfig)
 	if (lc.has_redirect)
 		return handleRedirect(lc.redirect_code, lc.redirect_target);
 
-	// if (!isMethodAllowed(lc, _request.method))
-	// {
-	// 	std::cout << "method not allowed: METHODE_NOT_ALLOWED" << std::endl;
-	// 	return handleErrorResponse(serverConfig, METHODE_NOT_ALLOWED);
-	// }
+	if (!isMethodAllowed(lc, _request.method))
+	{
+		std::cout << "method not allowed: METHODE_NOT_ALLOWED" << std::endl;
+		return handleErrorResponse(serverConfig, METHODE_NOT_ALLOWED);
+	}
 
 	std::string fullPath = getCorrectFullPath(serverConfig, lc, _request.path);
 
@@ -392,5 +391,5 @@ void Client::routing(const ServerConfig& serverConfig)
 		return routingPost(serverConfig, lc, fullPath);
 
 	if (_request.method == "DELETE")
-		return routingDelete(serverConfig, lc, fullPath);
+		return routingDelete(serverConfig, fullPath);
 }
