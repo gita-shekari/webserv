@@ -99,6 +99,7 @@ void Client::handleErrorResponse(const ServerConfig& sc, HttpStatus code)
 {
 	_request.httpStatus = code;
 	_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), sc);
+	_writeBuffer = _builder.serialize(_response);
 }
 
 void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
@@ -153,6 +154,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 		for (size_t i = 0; i < list.size(); i++)
 			std::cout << list[i] << std::endl;
 		_response = _builder.buildListingResponse(list, _request.path);
+		_writeBuffer = _builder.serialize(_response);
 	}
 	else
 	{
@@ -173,18 +175,21 @@ void Client::handleCGI(const ServerConfig& serverConfig, const std::string& scri
 {
 	std::cout << "CGI not implemented yet: " << scriptPath << std::endl;
 	_response = _builder.buildErrorResponse(501, serverConfig);
+	_writeBuffer = _builder.serialize(_response);
 }
 
 void Client::handleStatic(const ServerConfig& serverConfig, const std::string& filePath)
 {
 	std::cout << "static file: " << filePath << std::endl;
 	_response = _builder.buildStaticResponse(filePath, serverConfig);
+	_writeBuffer = _builder.serialize(_response);
 }
 
 void Client::handleRedirect(int code, const std::string& redirURI)
 {
 	std::cout << "redirect " << code << " to " << redirURI << std::endl;
 	_response = _builder.buildRedirectResponse(code, redirURI);
+	_writeBuffer = _builder.serialize(_response);
 }
 
 void Client::handleDelete(const ServerConfig& serverConfig, const std::string& filePath)
@@ -204,6 +209,7 @@ void Client::handleDelete(const ServerConfig& serverConfig, const std::string& f
 		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 	}
 	_response = _builder.buildNoContentResponse();
+	_writeBuffer = _builder.serialize(_response);
 }
 
 void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc)
@@ -236,7 +242,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 		else
 			_request.httpStatus = INTERNAL_SERVER_ERR;
 
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+		handleErrorResponse(serverConfig, _request.httpStatus);
 		return;
 	}
 
@@ -246,7 +252,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 	{
 		out.close();
 		_request.httpStatus = INTERNAL_SERVER_ERR;
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+		handleErrorResponse(serverConfig, _request.httpStatus);
 		return;
 	}
 
@@ -255,6 +261,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 	std::cout << "uploaded to " << target << std::endl;
 
 	_response = _builder.buildCreatedResponse(_request.path + name.str());
+	_writeBuffer = _builder.serialize(_response);
 }
 
 void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
