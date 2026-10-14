@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include "Logger.hpp"
+#include <cstring>
 
 // helper
 

@@ -2,8 +2,6 @@
 #include <algorithm>
 #include <cerrno>
 
-
-
 //TODO: no use
 bool Server::getRunning(void)
 {
