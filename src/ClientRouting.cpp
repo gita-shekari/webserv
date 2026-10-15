@@ -174,6 +174,10 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 void Client::handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath)
 {
 	std::cout << "CGI not implemented yet: " << scriptPath << std::endl;
+
+	// now we know we are dealing with cgi, see how it works. if the pipe is created, we need to update server's _pipeFds. 
+	std::cout << "client state change to CGI_RUNNING. _pipeFds will be updated." << std::endl;
+	_state = CGI_RUNNING;
 	_response = _builder.buildErrorResponse(501, serverConfig);
 	_writeBuffer = _builder.serialize(_response);
 }
