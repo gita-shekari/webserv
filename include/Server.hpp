@@ -35,6 +35,11 @@ class Server
 		void	addPollFds(int fd, short events);
 		bool	setNonBlocking(int fd);
 
+		bool	isCgiPipeFd(int fd);
+		Client& getBelongedClient(int fd);
+		void	handleEvent(pollfd& pfd, short& revents, Client& client);
+		void	handleCgiPipeEvent(pollfd& pfd, short& revents);
+
 		
 		//Utils
 		bool	getRunning(void);
@@ -74,6 +79,7 @@ class Server
 
 		std::map<int, size_t>						_listeners;
 		std::map<int, Client>						_clients;
+		std::map<int, int>							_pipeFds;
 		
 		Server(void);
 };

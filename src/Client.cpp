@@ -58,6 +58,11 @@ ssize_t Client::getWriteOffSet() const
 	return _writeOffSet;
 }
 
+ClientState	Client::getState() const
+{
+	return _state;
+}
+
 void Client::setWriteOffSet(ssize_t byte)
 {
 	_writeOffSet = byte;
@@ -81,6 +86,11 @@ void	Client::setEffectiveMaxBodySize(size_t size)
 void	Client::disConnected(void)
 {
 	_isConnected = false;
+}
+
+void	Client::setState(ClientState state)
+{
+	_state = state;
 }
 
 void	Client::appendReadBuffer(const char* data, size_t size)

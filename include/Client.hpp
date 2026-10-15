@@ -8,6 +8,7 @@
 # include <iostream>
 # include <cstddef> //for size_t
 # include <chrono> // for steady_clock
+# include <map>
 
 //enum	ConfigBehavior
 //{
@@ -20,6 +21,14 @@
 //	METHOD_NOT_FOUND
 //};
 
+enum ClientState
+{
+	READ_REQ,
+	REQ_READY,
+	CGI_RUNNING,
+	RESPONSE_READY,
+	SENDING_REPSONSE,
+};
 
 class Client
 {
@@ -39,12 +48,15 @@ class Client
 		Request		getReq(void) const;
 		std::chrono::steady_clock::time_point	getLastActivity(void) const;
 		ssize_t		getWriteOffSet() const;
+		ClientState getState() const;
+
 
 		// setters
 		void		setRequestPath(const std::string& str); // for testing
 		void		setEffectiveMaxBodySize(size_t size);
 		void		disConnected(void);
 		void		setWriteOffSet(ssize_t byte);
+		void		setState(ClientState state);
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -81,6 +93,7 @@ class Client
 		RequestParser	_parser;
 		Response		_response;
 		ResponseBuilder	_builder;
+		ClientState		_state;
 
 		std::chrono::steady_clock::time_point	_lastActivity;
 };

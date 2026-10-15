@@ -193,7 +193,7 @@ void	Server::runningLoop(void)
 				// TODO: to be created
 				if (isCgiPipeFd(fd))
                 {
-                    handleCgiPipeEvent(fd, revents);
+                    handleCgiPipeEvent(_pollfds[i], revents);
                     continue;
                 }
 
@@ -201,51 +201,11 @@ void	Server::runningLoop(void)
 					continue;
 					
 				Client& client = getClient(fd);
-
-				if (revents & POLLIN)
-				{	
-					if (client.getState() == READ_REQ)
-					{
-						if (!receiveClientData(client))
-							continue;
-					}
-					if (client.getState() == REQ_READY)
-					{
-						client.routing(_config[client.getServerIndex()]);
-					}
-					
-					
-					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
-					//CGI processing
-				}
-				if (client.getState() == RESPONSE_READY)
-				{
-					// build serialize
-					//TODO: to create 
-					enableClientWriteEvent(fd);
-                    client.setState(SENDING_REPSONSE);
-					_pollfds[i].events |= POLLOUT;
-				}
-				if (revents & POLLOUT)
-				{
-					if (client.getState() == SENDING_REPSONSE)
-					{
-						if (!sendClientData(client))
-							continue;
-						
-						// Only disable POLLOUT when the entire response
-                        // has been sent.
-						//TODO: to create
-                        disableClientWriteEvent(fd);
-						_pollfds[i].events &= ~POLLOUT;
-					}
-					// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
-					// if request.headers contains "connection" and "close", mark fd close
-				}
+				handleEvent(_pollfds[i], revents, client);
 			}
 		}
 		//
-		checkCgiProcesses();
+		//TODO:: checkCgiProcesses();
 		checkTimeouts();
 		// need to remove closed fds from pollFds, also check how the macro works with revents.
 		removeCloseClient();
