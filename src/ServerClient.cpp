@@ -95,7 +95,13 @@ bool	Server::receiveClientData(Client& client)
 		}
 		if (status == INCOMPLETE)
 			return false;
-		return true;
+
+		if (status == COMPLETE || status == ERROR)
+		{
+			client.setState(REQ_READY);
+			return true;
+		}
+		return false;
 	}
 	else if (bytesReceived == 0)
 	{
@@ -124,19 +130,20 @@ bool	Server::receiveClientData(Client& client)
 	}
 }
 
-bool	Server::sendClientData(Client& client)
+bool Server::sendClientData(Client& client)
 {
 	int fd = client.getFd();
 	Logger::debug("response ready to send: fd=" + std::to_string(fd));
 
-	const std::string &buffer = client.getWriteBuffer();
-	const std::string bufferToSend = buffer.data() + client.getWriteOffSet();
-	ssize_t bytesSent = send(fd, bufferToSend.c_str(), bufferToSend.size(), 0);
+	const std::string& buffer = client.getWriteBuffer();
+	ssize_t offset = client.getWriteOffSet();
+
+	ssize_t bytesSent = send(fd, buffer.data() + offset, buffer.size() - offset, 0);
 
 	if (bytesSent > 0)
 	{
-		client.updateLastActivity();	
-		client.setWriteOffSet(bytesSent);
+		client.updateLastActivity();
+		client.setWriteOffSet(offset + bytesSent);
 		if (static_cast<size_t>(client.getWriteOffSet()) == buffer.size())
 			return true;
 		return false;
@@ -144,10 +151,11 @@ bool	Server::sendClientData(Client& client)
 	if (bytesSent == -1)
 	{
 		int saveErr = errno;
+
 		if (saveErr == EAGAIN || saveErr == EWOULDBLOCK || saveErr == EINTR)
 			return false;
 		Logger::systemError(Logger::ERROR, "send failed", saveErr);
-		markForClose(client.getFd());
+		markForClose(fd);
 	}
 	return false;
 }

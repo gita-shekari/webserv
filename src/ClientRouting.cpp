@@ -23,7 +23,7 @@ std::string joinPath(const std::string& root, const std::string& path)
 		return path;
 	if (path.empty())
 		return root;
-	
+
 	bool rootEndsSlash = root[root.size() - 1] == '/';
 	bool pathStartsSlash = path[0] == '/';
 
@@ -47,17 +47,17 @@ bool isCGI(const LocationConfig& lc, const std::string& path)
 	std::string ext;
 	size_t dot = path.find_last_of('.');
 	size_t slash = path.find_last_of('/');
-	
+
 	if (dot == std::string::npos)
 		return false;
 	if (slash != std::string::npos && slash > dot)
 		return false;
-	
+
 	ext = path.substr(dot);
 
 	if (lc.cgi_extension == ext)
 		return true;
-	
+
 	//if (lc.cgiHandlers.find(ext) != lc.cgiHandlers.end())
 	//	return true;
 	return false;
@@ -99,12 +99,13 @@ void Client::handleErrorResponse(const ServerConfig& sc, HttpStatus code)
 {
 	_request.httpStatus = code;
 	_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), sc);
+	_state = RESPONSE_READY;
 }
 
 void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
 {
 	DIR *dir = opendir(fullPath.c_str());
-			
+
 	if (dir != NULL)
 	{
 		std::vector<std::string> list;
@@ -153,6 +154,7 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::strin
 		for (size_t i = 0; i < list.size(); i++)
 			std::cout << list[i] << std::endl;
 		_response = _builder.buildListingResponse(list, _request.path);
+		_state = RESPONSE_READY;
 	}
 	else
 	{
@@ -173,18 +175,21 @@ void Client::handleCGI(const ServerConfig& serverConfig, const std::string& scri
 {
 	std::cout << "CGI not implemented yet: " << scriptPath << std::endl;
 	_response = _builder.buildErrorResponse(501, serverConfig);
+	_state = RESPONSE_READY;
 }
 
 void Client::handleStatic(const ServerConfig& serverConfig, const std::string& filePath)
 {
 	std::cout << "static file: " << filePath << std::endl;
 	_response = _builder.buildStaticResponse(filePath, serverConfig);
+	_state = RESPONSE_READY;
 }
 
 void Client::handleRedirect(int code, const std::string& redirURI)
 {
 	std::cout << "redirect " << code << " to " << redirURI << std::endl;
 	_response = _builder.buildRedirectResponse(code, redirURI);
+	_state = RESPONSE_READY;
 }
 
 void Client::handleDelete(const ServerConfig& serverConfig, const std::string& filePath)
@@ -204,16 +209,12 @@ void Client::handleDelete(const ServerConfig& serverConfig, const std::string& f
 		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 	}
 	_response = _builder.buildNoContentResponse();
+	_state = RESPONSE_READY;
+
 }
 
 void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc)
 {
-	//if (lc.upload_store.empty())
-	//{
-	//	_request.httpStatus = FORBIDDEN;
-	//	_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-	//	return;
-	//}
 
 	static unsigned long counter = 0;
 
@@ -237,6 +238,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 			_request.httpStatus = INTERNAL_SERVER_ERR;
 
 		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+		_state = RESPONSE_READY;
 		return;
 	}
 
@@ -247,6 +249,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 		out.close();
 		_request.httpStatus = INTERNAL_SERVER_ERR;
 		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+		_state = RESPONSE_READY;
 		return;
 	}
 
@@ -255,6 +258,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 	std::cout << "uploaded to " << target << std::endl;
 
 	_response = _builder.buildCreatedResponse(_request.path + name.str());
+	_state = RESPONSE_READY;
 }
 
 void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
@@ -262,11 +266,7 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 	struct stat buf;
 
 	if (!isURIAllowed(&buf, fullPath))
-	{
-		std::cout << "http status has errors" << std::endl;
 		return handleErrorResponse(sc, _request.httpStatus);
-	}
-
 	if (S_ISDIR(buf.st_mode))
 	{
 		if (!_request.path.empty() && _request.path[_request.path.size() - 1] != '/')
@@ -277,7 +277,7 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 		if (!lc.index.empty())
 		{
 			if (isCGI(lc, joinPath(fullPath, lc.index)))
-				return handleCGI(sc, joinPath(fullPath, lc.index));	
+				return handleCGI(sc, joinPath(fullPath, lc.index));
 			std::cout << "lc index, handleStatic " << std::endl;
 			return handleStatic(sc, joinPath(fullPath, lc.index));
 		}
@@ -338,7 +338,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 
 	if (!pathAllowed)
 		return handleErrorResponse(sc, _request.httpStatus);
-	
+
 	return handleErrorResponse(sc, FORBIDDEN);
 }
 
@@ -381,10 +381,10 @@ void Client::routing(const ServerConfig& serverConfig)
 
 	if (_request.method == "GET")
 		return routingGet(serverConfig, lc, fullPath);
-	
+
 	if (_request.method == "POST")
 		return routingPost(serverConfig, lc, fullPath);
-	
+
 	if (_request.method == "DELETE")
 		return routingDelete(serverConfig, fullPath);
 }
