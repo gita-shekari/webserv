@@ -111,7 +111,7 @@ bool	Server::receiveClientData(Client& client)
 		if (saveErr == ECONNRESET || saveErr == ETIMEDOUT)
 		{
 			markForClose(fd);
-			Logger::systemError(Logger::INFO, "recv: client connection ended", saveErr);
+			Logger::info("recv: client connection ended");
 		}
 		else if (saveErr == EINTR)
 			Logger::debug("recv interrupted; retry on the next event");
