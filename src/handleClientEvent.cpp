@@ -64,7 +64,7 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 {
 	Client& client = getBelongedClient(pfd.fd);
-	if (!client.getState() == CGI_RUNNING)
+	if (client.getState() != CGI_RUNNING)
 		return handleEvent(pfd, revents, client);
 
 	// TODO:: check whether the pipe is finished. 
