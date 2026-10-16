@@ -549,8 +549,7 @@ LocationConfig ConfigParser::parseLocation()
 		else if (_tokens[_current] == "autoindex")
 			parseAutoindex(lc);
 
-		else if (_tokens[_current] ==
-				 "client_max_body_size")
+		else if (_tokens[_current] == "client_max_body_size")
 			parseClientMaxBodySize(lc);
 
 		else if (_tokens[_current] == "upload")

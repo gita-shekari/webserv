@@ -36,10 +36,15 @@ std::string joinPath(const std::string& root, const std::string& path)
 
 std::string getCorrectFullPath(const ServerConfig& sc, const LocationConfig& lc, std::string reqPath)
 {
-	std::string root = sc.root;
-	if (lc.root.size() != 0)
-		root = lc.root;
-	return joinPath(root, reqPath);
+	if (!lc.root.empty())
+	{
+		std::string relativePath = reqPath;
+		if (relativePath.find(lc.path) == 0)
+			relativePath = relativePath.substr(lc.path.size());
+
+		return joinPath(lc.root, relativePath);
+	}
+	return joinPath(sc.root, reqPath);
 }
 
 bool isCGI(const LocationConfig& lc, const std::string& path)
