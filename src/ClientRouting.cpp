@@ -1,12 +1,4 @@
 #include "Client.hpp"
-#include <vector>
-#include <algorithm>
-#include <cerrno>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <unistd.h>
-#include "Logger.hpp"
-#include <cstring>
 
 // helper
 
@@ -55,17 +47,10 @@ bool isCGI(const LocationConfig& lc, const std::string& path)
 
 	if (dot == std::string::npos)
 		return false;
-	if (slash != std::string::npos && slash > dot)
+	if (slash != std::string::npos && slash > dot) //if dot belonging to a directory instead of the filename like cgi.file/test
 		return false;
-
 	ext = path.substr(dot);
-
-	if (lc.cgi_extension == ext)
-		return true;
-
-	//if (lc.cgiHandlers.find(ext) != lc.cgiHandlers.end())
-	//	return true;
-	return false;
+	return (lc.cgi_extension == ext);
 }
 /**
  * @brief Checks whether a requested filesystem path can be handled by the server.
@@ -249,13 +234,6 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, const std:
 	_state = RESPONSE_READY;
 }
 
-void Client::handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath)
-{
-	std::cout << "CGI not implemented yet: " << scriptPath << std::endl;
-	_response = _builder.buildErrorResponse(501, serverConfig);
-	_state = RESPONSE_READY;
-}
-
 void Client::handleStatic(const ServerConfig& serverConfig, const std::string& filePath)
 {
 	std::cout << "static file: " << filePath << std::endl;
@@ -382,36 +360,40 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 	{
 		if (!_request.path.empty() && _request.path[_request.path.size() - 1] != '/')
 		{
-			std::cout << "redirect get directory no /: code 301" << std::endl;
+			Logger::debug("GET directory missing trailing slash: redirecting with 301");
 			return handleRedirect(301, _request.path + '/');
 		}
 		if (!lc.index.empty())
 		{
-			if (isCGI(lc, joinPath(fullPath, lc.index)))
-				return handleCGI(sc, joinPath(fullPath, lc.index));
-			std::cout << "lc index, handleStatic " << std::endl;
-			return handleStatic(sc, joinPath(fullPath, lc.index));
+			std::string indexPath = joinPath(fullPath, lc.index);
+			struct stat indexBuf;
+			if (!isURIAllowed(&indexBuf, indexPath))
+				return handleErrorResponse(sc, _request.httpStatus);
+			if (isCGI(lc, indexPath))
+			{
+				Logger::debug("GET directory index detected as CGI: calling handleCGI");
+				return handleCGI(sc, lc, indexPath);
+			}
+			return handleStatic(sc, indexPath);
 		}
 		if (lc.autoindex)
 		{
-			std::cout << "dir, no index, autoindex on: handleDirectoryListing()"<< std::endl;
+			Logger::debug("GET directory: no index configured, autoindex enabled");
 			return handleDirectoryListing(sc, fullPath);
 		}
 		return handleErrorResponse(sc, FORBIDDEN);
 	}
-
 	if (S_ISREG(buf.st_mode))
 	{
 		if (isCGI(lc, fullPath))
 		{
-			std::cout << "regular get, is cgi. handleCGI" << std::endl;
-			return handleCGI(sc, fullPath);
+			Logger::debug("GET regular file detected as CGI: calling handleCGI");
+			return handleCGI(sc, lc, fullPath);
 		}
-		std::cout << "regular not cgi. handleStacit" << std::endl;
 		return handleStatic(sc, fullPath);
 	}
 }
-
+// need to check isURI after joinPath as well. like routingGet
 void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
 {
 	struct stat buf;
@@ -429,7 +411,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 			if (isCGI(lc, joinPath(fullPath, lc.index)))
 			{
 				std::cout << "post, path is direc, add index is cgi. handleCGI()" << std::endl;
-				return handleCGI(sc, joinPath(fullPath, lc.index));
+				return handleCGI(sc, lc, joinPath(fullPath, lc.index));
 			}
 		}
 	}
@@ -438,7 +420,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 		if (isCGI(lc, fullPath))
 		{
 			std::cout << "post, is cgi. handleCGI()" << std::endl;
-			return handleCGI(sc, fullPath);
+			return handleCGI(sc, lc, fullPath);
 		}
 	}
 	if (lc.upload_enabled && !lc.upload_store.empty())
@@ -488,10 +470,7 @@ void Client::routing(const ServerConfig& serverConfig)
 		return handleRedirect(lc.redirect_code, lc.redirect_target);
 
 	if (!isMethodAllowed(lc, _request.method))
-	{
-		std::cout << "method not allowed: METHODE_NOT_ALLOWED" << std::endl;
 		return handleErrorResponse(serverConfig, METHODE_NOT_ALLOWED);
-	}
 
 	std::string fullPath = getCorrectFullPath(serverConfig, lc, _request.path);
 

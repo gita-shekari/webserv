@@ -9,6 +9,12 @@
 # include <iostream>
 # include <cstddef> //for size_t
 # include <chrono> // for steady_clock
+#include <vector>
+#include <algorithm>
+#include <cerrno>
+#include <unistd.h>
+#include "Logger.hpp"
+#include <cstring>
 
 //enum	ConfigBehavior
 //{
@@ -77,7 +83,7 @@ class Client
 		bool		readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries);
 		void		handleDirectoryOpenError(const ServerConfig& serverConfig);
 		void		handleDirectoryListing(const ServerConfig& serverConfig, const std::string& fullPath);
-		void 		handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath);
+		void		handleCGI(const ServerConfig& serverConfig, const LocationConfig& lc, const std::string& scriptPath);
 		void		handleStatic(const ServerConfig& serverConfig, const std::string& filePath);
 		void		handleRedirect(int code, const std::string& redirURI);
 		void		handleDelete(const ServerConfig& serverConfig, const std::string& filePath);
