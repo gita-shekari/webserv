@@ -67,7 +67,28 @@ bool isCGI(const LocationConfig& lc, const std::string& path)
 	//	return true;
 	return false;
 }
-
+/**
+ * @brief Checks whether a requested filesystem path can be handled by the server.
+ *
+ * Uses stat() to check whether the path exists and to get information
+ * about the filesystem object.
+ *
+ * If stat() fails:
+ * - ENOENT / ENOTDIR -> 404 Not Found
+ * - EACCES            -> 403 Forbidden
+ * - other errors      -> 500 Internal Server Error
+ *
+ * If stat() succeeds, only regular files and directories are allowed.
+ * Other filesystem object types are rejected with 403 Forbidden.
+ *
+ * The provided struct stat is filled by stat() and can later be used
+ * to check whether the path is a file or a directory.
+ *
+ * @param buf   Pointer to a struct stat that will be filled by stat()
+ * @param path path to check
+ *
+ * @return true if the path is a regular file or directory, otherwise false.
+ */
 bool Client::isURIAllowed(struct stat* buf, std::string path)
 {
 	if (stat(path.c_str(), buf) == -1)
@@ -106,74 +127,126 @@ void Client::handleErrorResponse(const ServerConfig& sc, HttpStatus code)
 	_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), sc);
 	_state = RESPONSE_READY;
 }
-
-void Client::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
+/**
+ * @brief Checks whether an entry inside a directory is itself a directory.
+ *
+ * Builds the complete filesystem path of the entry and uses stat()
+ * to retrieve its metadata.
+ *
+ * S_ISDIR(info.st_mode) checks whether the file type stored in st_mode
+ * represents a directory.
+ *
+ * @param fullPath
+ * @param name      Name of the entry inside that directory.
+ *
+ * @return true if the entry is a directory, otherwise false.
+ */
+bool Client::isDirectoryEntry(const std::string& fullPath, const std::string& name)
 {
-	DIR *dir = opendir(fullPath.c_str());
+	std::string entryPath = fullPath;
 
-	if (dir != NULL)
+	if (!entryPath.empty() && entryPath[entryPath.size() - 1] != '/')
+		entryPath += '/';
+	entryPath += name;
+	struct stat info;
+	if (stat(entryPath.c_str(), &info) == -1)
+		return false;
+	return S_ISDIR(info.st_mode);
+}
+/**
+ * @brief Reads the entries of an opened directory.
+ *
+ * Uses readdir() to read one entry at a time from the directory stream.
+ * Hidden entries are skipped when their name starts with '.', including
+ * ".", "..", and other hidden files.
+ *
+ * If an entry is itself a directory, "/" is added only to the displayed
+ * name so that directories are clear in the generated autoindex
+ * (for example "images/"). This does not rename the real directory.
+ *
+ * @param dir       Opened directory stream returned by opendir().
+ * @param fullPath  Filesystem path of the directory being read.
+ * @param entries   Vector where the entry names are stored.
+ *
+ * @return true if the directory is read successfully, otherwise false.
+ */
+bool Client::readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries)
+{
+	while (true)
 	{
-		std::vector<std::string> list;
-		std::cout << "before readdir loop \n" << std::endl;
-		struct dirent *ent;
-		while(true)
+		errno = 0;
+		struct dirent* entry = readdir(dir);
+		if (entry == NULL)
 		{
-			errno = 0;
-			ent = readdir(dir);
-			if (ent == NULL)
-			{
-				if (errno != 0)
-				{
-					int saveErr = errno;
-					if (closedir(dir) == -1)
-					{
-						Logger::error("closedir failed for " + fullPath + ": " + std::strerror(saveErr));
-					};
-					return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
-				}
-				break;
-			}
-			std::string name(ent->d_name);
-			if (!name.empty() && name[0] == '.') // skip hidden files.
-				continue;
-
-			//what is this?
-			struct stat entBuf;
-			std::string entryPath = fullPath;
-
-			if (!entryPath.empty() && entryPath[entryPath.size() - 1] != '/')
-				entryPath += '/';
-
-			entryPath += name;
-
-			if (stat(entryPath.c_str(), &entBuf) == 0 && S_ISDIR(entBuf.st_mode))
-				name += "/";
-			///
-
-			list.push_back(name);
+			if (errno != 0)
+				return false;
+			break;
 		}
-		if (closedir(dir) == -1)
-			std::cout << "closedir failed at " << fullPath << std::endl; // change to logger
-		std::sort(list.begin(), list.end());
-		std::cout << "Listing Directory" << std::endl;
-		for (size_t i = 0; i < list.size(); i++)
-			std::cout << list[i] << std::endl;
-		_response = _builder.buildListingResponse(list, _request.path);
-		_state = RESPONSE_READY;
+		std::string name(entry->d_name);
+		if (!name.empty() && name[0] == '.')
+			continue;
+		if (isDirectoryEntry(fullPath, name))
+			name += "/";
+		entries.push_back(name);
 	}
+	return true;
+}
+
+void Client::handleDirectoryOpenError(const ServerConfig& serverConfig)
+{
+	int saveErr = errno;
+
+	if (saveErr == EACCES || saveErr == ELOOP)
+		handleErrorResponse(serverConfig, FORBIDDEN);
+	else if (saveErr == ENOENT || saveErr == ENOTDIR)
+		handleErrorResponse(serverConfig, PAGE_NOT_FOUND);
 	else
+		handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
+}
+/**
+ * @brief Generates an autoindex response for a directory.
+ *
+ * Opens the directory using opendir(), reads its entries with readdir(),
+ * sorts them and passes the result list to ResponseBuilder
+ * DIR is an opaque directory-stream type defined by <dirent.h>
+ * A DIR* is a handle to an opened directory stream
+ * Its internal structure is hidden from the user and should only be used with functions: opendir(), readdir() and closedir()
+ *
+ * @param serverConfig
+ * @param fullPath
+ */
+void Client::handleDirectoryListing(const ServerConfig& serverConfig, const std::string& fullPath)
+{
+	Logger::debug("directory listing requested: path=" + fullPath);
+	DIR* dir = opendir(fullPath.c_str());
+	if (dir == NULL)
 	{
-		int saveErr = errno;
-		if (saveErr == EACCES || saveErr == ELOOP)
-			_request.httpStatus = FORBIDDEN;
-		else if (saveErr == ENOENT || saveErr == ENOTDIR)
-			_request.httpStatus = PAGE_NOT_FOUND;
-		else
-			_request.httpStatus = INTERNAL_SERVER_ERR;
-		std::cout << "opendir erro. status code = " << _request.httpStatus << std::endl;
-		std::cout << "saveErr " << saveErr << std::endl;
-		handleErrorResponse(serverConfig, _request.httpStatus);
+		Logger::debug("opendir failed: path=" + fullPath);
+		handleDirectoryOpenError(serverConfig);
+		return;
 	}
+	std::vector<std::string> entries;
+	if (!readDirectoryEntries(dir, fullPath, entries))
+	{
+		int readErr = errno;
+		if (closedir(dir) == -1)
+		{
+			int closeErr = errno;
+			Logger::error("closedir failed for " + fullPath + ": " + std::strerror(closeErr));
+		}
+		Logger::error("readdir failed for " + fullPath + ": " + std::strerror(readErr));
+		handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
+		return;
+	}
+	if (closedir(dir) == -1)
+	{
+		int closeErr = errno;
+		Logger::error("closedir failed for " + fullPath + ": " + std::strerror(closeErr));
+	}
+	std::sort(entries.begin(), entries.end());
+	Logger::debug("directory listing completed: path=" + fullPath);
+	_response = _builder.buildListingResponse(entries, _request.path);
+	_state = RESPONSE_READY;
 }
 
 void Client::handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath)
@@ -196,13 +269,28 @@ void Client::handleRedirect(int code, const std::string& redirURI)
 	_response = _builder.buildRedirectResponse(code, redirURI);
 	_state = RESPONSE_READY;
 }
-
+/**
+ * @brief Deletes a regular file from the filesystem.
+ *
+ * Uses unlink() to remove the file at filePath.
+ * If unlink() fails, errno is checked and mapped to an HTTP status:
+ *
+ * - permission / filesystem restriction errors -> 403 Forbidden
+ * - missing path errors                       -> 404 Not Found
+ * - other errors                              -> 500 Internal Server Error
+ *  -EACCES( permission denied), EPERM(operation not permitted), EISDIR(target is a directory), EROFS(filesystem is read-only), EBUSY(resource is busy), ELOOP(too many symbolic-link resolutions)
+ *  -ENOENT(file/path does not exist), ENOTDIR(some component of the path that should be a directory is not a directory)
+ * If the file is deleted successfully, a 204(NoContentResponse) is built
+ *
+ * @param serverConfig
+ * @param filePath
+ */
 void Client::handleDelete(const ServerConfig& serverConfig, const std::string& filePath)
 {
 	if (unlink(filePath.c_str()) == -1)
 	{
 		const int saveErr = errno;
-
+		Logger::debug("delete failed: path=" + filePath + ", errno=" + std::to_string(saveErr));
 		if (saveErr == EACCES || saveErr == EPERM
 			|| saveErr == EISDIR || saveErr == EROFS
 			|| saveErr == EBUSY || saveErr == ELOOP)
@@ -213,14 +301,30 @@ void Client::handleDelete(const ServerConfig& serverConfig, const std::string& f
 
 		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 	}
+	Logger::debug("delete successful: path=" + filePath);
 	_response = _builder.buildNoContentResponse();
 	_state = RESPONSE_READY;
 
 }
-
+/**
+ * @brief POST body
+   ↓
+handleUpload()
+   ↓
+create unique filename
+   ↓
+open www/uploads/filename
+   ↓
+write body
+   ↓
+success -> 201
+failure -> 403 or 500
+ *
+ * @param serverConfig
+ * @param lc
+ */
 void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc)
 {
-
 	static unsigned long counter = 0;
 
 	std::string dir = lc.upload_store;
@@ -232,40 +336,42 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 	name << "upload_" << time(NULL) << "_" << counter++;
 
 	std::string target = dir + name.str();
-
 	std::ofstream out(target.c_str(), std::ios::out | std::ios::binary);
-
 	if (!out.is_open())
 	{
-		if (errno == EACCES)
+		const int saveErr = errno;
+		Logger::error("upload failed to open target: path=" + target + ", error=" + std::string(std::strerror(saveErr)));
+		if (saveErr == EACCES)
 			_request.httpStatus = FORBIDDEN;
 		else
 			_request.httpStatus = INTERNAL_SERVER_ERR;
 
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+		_response = _builder.buildErrorResponse(_request.httpStatus, serverConfig);
 		_state = RESPONSE_READY;
 		return;
 	}
-
 	out.write(_request.body.c_str(), _request.body.size());
-
 	if (!out.good())
 	{
+		Logger::error("upload failed while writing: path=" + target);
 		out.close();
-		_request.httpStatus = INTERNAL_SERVER_ERR;
-		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
+		_response = _builder.buildErrorResponse(INTERNAL_SERVER_ERR, serverConfig);
 		_state = RESPONSE_READY;
 		return;
 	}
-
 	out.close();
-
-	std::cout << "uploaded to " << target << std::endl;
-
+	Logger::debug("upload successful: path=" + target + ", bytes=" + std::to_string(_request.body.size()));
 	_response = _builder.buildCreatedResponse(_request.path + name.str());
 	_state = RESPONSE_READY;
 }
-
+/**
+ * @brief Handles a GET request after the matching server and location
+ *  The path may represent: a directory, a regular file , an invalid or inaccessible resource
+ *
+ * @param sc
+ * @param lc
+ * @param fullPath
+ */
 void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::string& fullPath)
 {
 	struct stat buf;
@@ -346,24 +452,29 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 
 	return handleErrorResponse(sc, FORBIDDEN);
 }
-
+/**
+ * @brief checks if URI is allowed and then if it's a directory. only files can be deleted
+ *
+ * @param sc
+ * @param fullPath
+ */
 void Client::routingDelete(const ServerConfig& sc, std::string& fullPath)
 {
 	struct stat buf;
 
 	if (!isURIAllowed(&buf, fullPath))
 	{
-		std::cout << "delete, url not allowed" << std::endl;
+		Logger::debug("delete failed: resource is not accessible");
 		return handleErrorResponse(sc, _request.httpStatus);
 	}
 
 	if (S_ISDIR(buf.st_mode))
 	{
-		std::cout << "delete, paht is dir, forbidden" << std::endl;
+		Logger::debug("delete forbidden: target is a directory, path=" + fullPath);
 		return handleErrorResponse(sc, FORBIDDEN);
 	}
 
-	std::cout << "delete, regular handleDelete" << std::endl;
+	Logger::debug("delete request accepted: deleting regular file, path=" + fullPath);
 	return handleDelete(sc, fullPath);
 }
 

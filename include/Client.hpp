@@ -3,7 +3,8 @@
 # include "Http.hpp"
 # include "RequestParser.hpp"
 # include "ResponseBuilder.hpp"
-
+#include <sys/stat.h>
+#include <dirent.h>
 # include <string>
 # include <iostream>
 # include <cstddef> //for size_t
@@ -26,7 +27,7 @@ enum ClientState
 	REQ_READY,
 	CGI_RUNNING,
 	RESPONSE_READY,
-	SENDING_RESPONSE,
+	SENDING_RESPONSE
 	//CLOSE_CLIENT
 };
 
@@ -72,7 +73,10 @@ class Client
 		void		routingDelete(const ServerConfig& sc, std::string& fullPath);
 
 		void		handleErrorResponse(const ServerConfig& sc, HttpStatus code);
-		void 		handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
+		bool		isDirectoryEntry(const std::string& fullPath, const std::string& name);
+		bool		readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries);
+		void		handleDirectoryOpenError(const ServerConfig& serverConfig);
+		void		handleDirectoryListing(const ServerConfig& serverConfig, const std::string& fullPath);
 		void 		handleCGI(const ServerConfig& serverConfig, const std::string& scriptPath);
 		void		handleStatic(const ServerConfig& serverConfig, const std::string& filePath);
 		void		handleRedirect(int code, const std::string& redirURI);
