@@ -23,17 +23,16 @@ bool	UriUtils::handleRawTarget(Request& req)
 		return false;
 	if (!validatePercentEncoding(rawQuery))
 		return false;
-	
 	//decode only the path
 	std::string decodedPath;
 
 	if (!percentDecode(rawPath, decodedPath))
 		return false;
-	
+
 	//validate the decoded path
 	if (!validateDecodedPath(decodedPath))
 		return false;
-	
+
 	//normalize ".", "..", repeated slashed, etc
 	std::string normalizedPath;
 
@@ -99,17 +98,16 @@ bool	UriUtils::validateDecodedPath(const std::string& path)
 {
 	if (path.empty())
 		return false;
-	
+
 	if (path[0] != '/')
 		return false;
-	
+
 	for (size_t i = 0; i < path.size(); ++i)
 	{
 		unsigned char c = static_cast<unsigned char>(path[i]);
 
 		if (c == '\0')
 			return false;
-		
 		if (c < 32 || c == 127)
 			return false;
 	}

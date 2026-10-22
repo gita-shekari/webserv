@@ -1,0 +1,1 @@
+This is a regular non-CGI file inside a CGI-enabled location.

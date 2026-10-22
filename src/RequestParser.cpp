@@ -5,6 +5,14 @@
 #include <cctype>
 #include <limits>
 
+std::string	toUpper(const std::string& str)
+{
+	std::string	ret = str;
+	for (size_t i = 0; i < ret.size(); ++i)
+		ret[i] = std::toupper(static_cast<unsigned char>(ret[i]));
+	return ret;
+}
+
 RequestParser::RequestParser(): _section(REQUEST_LINE), _cursor(0), _contentLength(0), _body(NO_BODY), _chunkState(CHUNK_SIZE), _chunkSize(0){}
 
 ParseStatus	RequestParser::parseRequest(const std::string& buffer, Request& req)
@@ -101,7 +109,7 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 		|| secondSpace + 1 >= line.size())
 		return error(req, BAD_REQ);
 		
-	req.method = line.substr(0, firstSpace);
+	req.method = toUpper(line.substr(0, firstSpace));
 	req.rawTarget = line.substr(firstSpace + 1, secondSpace - firstSpace - 1);
 	req.version = line.substr(secondSpace + 1);
 	if (req.version != "HTTP/1.1")

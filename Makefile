@@ -3,19 +3,21 @@ NAME = webserv
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++11
 
-SRC = \
-	src/Client.cpp \
-	src/ConfigParser.cpp \
-	test_files/test_match_location.cpp \
-	src/RequestParser.cpp \
-	src/UriUtils.cpp
-# 	src/Http.cpp \
-# 	src/Logger.cpp \
-# 	src/ResponseBuilder.cpp \
-# 	src/Server.cpp \
-# 	src/main.cpp
+SRC := $(shell find src -type f -name '*.cpp')
+OBJ := $(SRC:.cpp=.o)
+#SRC = \
+#	src/Client.cpp \
+#	src/ConfigParser.cpp \
+#	test_files/test_match_location.cpp \
+#	src/RequestParser.cpp \
+#	src/UriUtils.cpp
+## 	src/Http.cpp \
+## 	src/Logger.cpp \
+## 	src/ResponseBuilder.cpp \
+## 	src/Server.cpp \
+## 	src/main.cpp
 
-OBJ = $(SRC:.cpp=.o)
+#OBJ = $(SRC:.cpp=.o)
 
 INCLUDE = -Iinclude
 
