@@ -1,6 +1,6 @@
 #include "Server.hpp"
 // for non blocking
-#include <fcntl.h> 
+#include <fcntl.h>
 
 Server::Server(const std::vector<ServerConfig>& config)
 	: _config(config)
@@ -14,7 +14,7 @@ Server::~Server(void)
 		it != _listeners.end();
 		++it)
 		close(it->first);
-	
+
 	for (std::map<int, Client>::iterator it = _clients.begin();
 		it != _clients.end();
 		++it)
@@ -156,7 +156,7 @@ void	Server::runningLoop(void)
 
 	while (_isRunning)
 	{
-		const size_t polledFdCount = _pollfds.size(); 
+		const size_t polledFdCount = _pollfds.size();
 		if (polledFdCount == 0)
 			continue;
 		// because the size might change since accpet new fds push back in to _pollfds;
@@ -176,7 +176,7 @@ void	Server::runningLoop(void)
 			{
 				short revents = _pollfds[i].revents;
 				int fd = _pollfds[i].fd;
-				
+
 				if (revents == 0)
 					continue;
 
@@ -192,14 +192,14 @@ void	Server::runningLoop(void)
 
 				// TODO: to be created
 				if (isCgiPipeFd(fd))
-                {
-                    handleCgiPipeEvent(_pollfds[i], revents);
-                    continue;
-                }
+				{
+					handleCgiPipeEvent(_pollfds[i], revents);
+					continue;
+				}
 
 				if (!isClientFd(fd))
 					continue;
-					
+
 				Client& client = getClient(fd);
 				handleEvent(_pollfds[i], revents, client);
 			}

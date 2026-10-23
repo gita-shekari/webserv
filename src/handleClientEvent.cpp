@@ -24,7 +24,7 @@ Client& Server::getBelongedClient(int fd)
 void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 {
 	if (revents & POLLIN)
-	{	
+	{
 		if (client.getState() == READ_REQ)
 		{
 			if (!receiveClientData(client))
@@ -39,18 +39,17 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 	}
 	if (client.getState() == RESPONSE_READY)
 	{
-		// build serialize
-		//TODO: to create 
+		client.prepareResponseForSending();
 		pfd.events |= POLLOUT;
-		client.setState(SENDING_REPSONSE);
+
 	}
 	if (revents & POLLOUT)
 	{
-		if (client.getState() == SENDING_REPSONSE)
+		if (client.getState() == SENDING_RESPONSE)
 		{
 			if (!sendClientData(client))
 				return ; // continue the loop
-			
+
 			// Only disable POLLOUT when the entire response
 			// has been sent.
 			//TODO: to create
@@ -67,8 +66,8 @@ void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 	if (client.getState() != CGI_RUNNING)
 		return handleEvent(pfd, revents, client);
 
-	// TODO:: check whether the pipe is finished. 
+	// TODO:: check whether the pipe is finished.
 	// this function will change client state to RESPONSE_READY or keep it as CGI_RUNNING.
-	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY. 
+	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY.
 
 }

@@ -1,6 +1,6 @@
 #include "ConfigParser.hpp"
 
-std::string	toUpper(const std::string& str)
+std::string	Upper(const std::string& str)
 {
 	std::string	ret = str;
 	for (size_t i = 0; i < ret.size(); ++i)
@@ -321,7 +321,7 @@ void ConfigParser::parseMethods(LocationConfig& lc)
 	{
 		if (!isValidMethod(_tokens[_current]))
 			throw std::runtime_error("Invalid HTTP method: " + _tokens[_current]);
-		lc.methods.push_back(toUpper((_tokens[_current])));
+		lc.methods.push_back(Upper((_tokens[_current])));
 		_current++;
 	}
 	expect(";");
@@ -549,8 +549,7 @@ LocationConfig ConfigParser::parseLocation()
 		else if (_tokens[_current] == "autoindex")
 			parseAutoindex(lc);
 
-		else if (_tokens[_current] ==
-				 "client_max_body_size")
+		else if (_tokens[_current] == "client_max_body_size")
 			parseClientMaxBodySize(lc);
 
 		else if (_tokens[_current] == "upload")

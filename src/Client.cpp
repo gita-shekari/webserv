@@ -58,11 +58,14 @@ ssize_t Client::getWriteOffSet() const
 	return _writeOffSet;
 }
 
-ClientState	Client::getState() const
+ClientState Client::getState() const
 {
 	return _state;
 }
-
+void Client::setState(ClientState st)
+{
+	_state = st;
+}
 void Client::setWriteOffSet(ssize_t byte)
 {
 	_writeOffSet = byte;
@@ -73,10 +76,6 @@ std::chrono::steady_clock::time_point	Client::getLastActivity(void) const
 	return _lastActivity;
 }
 
-void	Client::setRequestPath(const std::string& str)
-{
-	_request.path = str;
-}
 
 void	Client::setEffectiveMaxBodySize(size_t size)
 {
@@ -132,7 +131,12 @@ void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 		}
 	}
 }
-
+void Client::prepareResponseForSending()
+{
+	_writeBuffer = _builder.serialize(_response);
+	_writeOffSet = 0;
+	_state = SENDING_RESPONSE;
+}
 //enum	ConfigBehavior
 //{
 //	REDIRECT,
