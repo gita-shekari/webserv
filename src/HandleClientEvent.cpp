@@ -36,7 +36,7 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 		}
 		if (client.getState() == CGI_RUNNING)
 		{
-			//here we can register CGI pipfd for CGI
+			registerCgiPipes(client);
 		}
 	}
 	if (client.getState() == RESPONSE_READY)
@@ -72,4 +72,17 @@ void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 	// this function will change client state to RESPONSE_READY or keep it as CGI_RUNNING.
 	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY.
 
+}
+
+void	Server::registerCgiPipes(Client& client)
+{
+	// here I am gonna add pipfd and clientfd to the _pipfd
+	int inputFd = client.getCgiInputFd();
+	int outputFd = client.getCgiOutputFd();
+	int clientFd = client.getFd();
+	_pipeFds[inputFd] = clientFd;
+	_pipeFds[outputFd] = clientFd;
+	//I also need to call this function only once for a request, by adding a flag or sth I now I registerd it already
+	Logger::debug("registered CGI input fd=" + std::to_string(inputFd) + " for client fd=" + std::to_string(clientFd));
+	Logger::debug("registered CGI output fd=" + std::to_string(outputFd) + " for client fd=" + std::to_string(clientFd));
 }

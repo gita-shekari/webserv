@@ -35,6 +35,9 @@ class Server
 		void	addPollFds(int fd, short events);
 		bool	setNonBlocking(int fd);
 
+		void	registerCgiPipes(Client& client);
+		// void	removeCgiPipe(int fd);
+		// void	checkCgiProcesses(); /// next to do
 		bool	isCgiPipeFd(int fd);
 		Client& getBelongedClient(int fd);
 		void	handleEvent(pollfd& pfd, short& revents, Client& client);
