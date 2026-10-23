@@ -33,6 +33,11 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 		if (client.getState() == REQ_READY)
 		{
 			client.routing(_config[client.getServerIndex()]);
+			//if (client.getState() == CGI_RUNNING)
+			//{
+			//	_pipeFds[client.getPipefd()] = client.getFd();
+			//	_pollfds.push_back(client.getPipefd());
+			//}
 		}
 		// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
 		//CGI processing
@@ -65,7 +70,7 @@ void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 	Client& client = getBelongedClient(pfd.fd);
 	if (client.getState() != CGI_RUNNING)
 		return handleEvent(pfd, revents, client);
-
+	//client.checkPIDprocess();
 	// TODO:: check whether the pipe is finished.
 	// this function will change client state to RESPONSE_READY or keep it as CGI_RUNNING.
 	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY.

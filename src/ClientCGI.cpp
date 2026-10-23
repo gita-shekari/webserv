@@ -73,7 +73,19 @@ void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& l
 	else
 	{
 		Logger::debug("parent");
+		//_pid = pid;
+		_state = CGI_RUNNING;
+
 	}
 }
 
 
+//checkPIDprocess()
+//{
+//	if (the process finished)
+//	{
+//		buildCGIResponse();
+//		_state = RESPONSE_READY;
+//		kill the process.
+//	}
+//}

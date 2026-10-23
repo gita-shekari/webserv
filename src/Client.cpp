@@ -87,11 +87,6 @@ void	Client::disConnected(void)
 	_isConnected = false;
 }
 
-void	Client::setState(ClientState state)
-{
-	_state = state;
-}
-
 void	Client::appendReadBuffer(const char* data, size_t size)
 {
 	_readBuffer.append(data, size);

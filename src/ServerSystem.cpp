@@ -97,6 +97,7 @@ bool	Server::handlePollException(int fd, short revents)
 {
 	if (!(revents & (POLLNVAL | POLLERR | POLLHUP)))
 		return false; // no exceptions found, continue with runningLoop()
+	// TODO: This need to be changed. because it might be the pipefd. 
 	if (!isListeningFd(fd) && !isClientFd(fd))
 	{
 		Logger::fatal("event registry invariant violated: fd has no valid owner");
