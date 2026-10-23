@@ -38,7 +38,18 @@ std::string getCorrectFullPath(const ServerConfig& sc, const LocationConfig& lc,
 	}
 	return joinPath(sc.root, reqPath);
 }
-
+/**
+ * @brief Checks whether a requested file should be handled as CGI.
+ *
+ * Extracts the file extension from the path and compares it with
+ * the CGI extension configured for the matched location.
+ *
+ * @param lc    Matched location configuration.
+ * @param path  Filesystem path of the requested file.
+ *
+ * @return true if the file extension matches the configured CGI extension,
+ * otherwise false.
+ */
 bool isCGI(const LocationConfig& lc, const std::string& path)
 {
 	std::string ext;
@@ -50,7 +61,12 @@ bool isCGI(const LocationConfig& lc, const std::string& path)
 	if (slash != std::string::npos && slash > dot) //if dot belonging to a directory instead of the filename like cgi.file/test
 		return false;
 	ext = path.substr(dot);
-	return (lc.cgi_extension == ext);
+	if(lc.cgi_extension == ext)
+	{
+		Logger::debug("GET directory index detected as CGI");
+		return true;
+	}
+	return false;
 }
 /**
  * @brief Checks whether a requested filesystem path can be handled by the server.

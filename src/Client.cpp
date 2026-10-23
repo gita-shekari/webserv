@@ -3,15 +3,18 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <dirent.h>
-
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
+	  _cgiPid(-1),
+	  _cgiInputFd(-1),
+	  _cgiOutputFd(-1),
+	  _cgiBodyOffset(0),
 	  _serverIndex(serverIndex),
 	  _isConnected(true),
 	  _writeOffSet(0),
 	  _lastActivity(std::chrono::steady_clock::now())
 {
-	std::cout << "A client is created fd: " << fd << std::endl;
+	Logger::debug("client created: fd=" + std::to_string(fd));
 }
 
 Client::~Client(void)
@@ -81,6 +84,62 @@ void	Client::setEffectiveMaxBodySize(size_t size)
 {
 	_request.effectiveMaxBodySize = size;
 }
+////CGI
+pid_t Client::getCgiPid() const
+{
+	return _cgiPid;
+}
+
+int Client::getCgiInputFd() const
+{
+	return _cgiInputFd;
+}
+
+int Client::getCgiOutputFd() const
+{
+	return _cgiOutputFd;
+}
+
+size_t Client::getCgiBodyOffset() const
+{
+	return _cgiBodyOffset;
+}
+
+const std::string& Client::getCgiOutput() const
+{
+	return _cgiOutput;
+}
+
+void Client::setCgiPid(pid_t pid)
+{
+	_cgiPid = pid;
+}
+
+void Client::setCgiInputFd(int fd)
+{
+	_cgiInputFd = fd;
+}
+
+void Client::setCgiOutputFd(int fd)
+{
+	_cgiOutputFd = fd;
+}
+
+void Client::setCgiBodyOffset(size_t offset)
+{
+	_cgiBodyOffset = offset;
+}
+
+void Client::appendCgiOutput(const char* data, size_t size)
+{
+	_cgiOutput.append(data, size);
+}
+
+void Client::clearCgiOutput()
+{
+	_cgiOutput.clear();
+}
+///End of CGI getters and setters
 
 void	Client::disConnected(void)
 {

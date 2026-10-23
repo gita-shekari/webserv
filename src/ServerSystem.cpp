@@ -161,12 +161,12 @@ void	Server::runningLoop(void)
 			continue;
 		// because the size might change since accpet new fds push back in to _pollfds;
 		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
-
-		if (res == -1)
-		{
-			handlePollCallError(eagainCount);
-			continue;
-		}
+		//for testing CGI
+		// if (res == -1)
+		// {
+		// 	handlePollCallError(eagainCount);
+		// 	continue;
+		// }
 
 		eagainCount = 0;
 

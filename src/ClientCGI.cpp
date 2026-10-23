@@ -42,10 +42,10 @@ void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& l
 	if (pid == 0)
 	{
 		if (dup2(inputPipe[0], STDIN_FILENO) == -1)
-			_exit(1);
+			exit(1);
 
 		if (dup2(outputPipe[1], STDOUT_FILENO) == -1)
-			_exit(1);
+			exit(1);
 
 		close(inputPipe[0]);
 		close(inputPipe[1]);

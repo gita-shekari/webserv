@@ -45,18 +45,28 @@ class Client
 		~Client(void);
 
 		//getters
-		int			getFd(void) const;
-		size_t		getServerIndex(void) const;
-		size_t		getLocationIndex(void) const;
-		size_t		getEffectiveMaxBodySize(void) const;
-		bool		getIsConnected(void) const;
-		const std::string& getWriteBuffer() const;
+		int					getFd(void) const;
+		size_t				getServerIndex(void) const;
+		size_t				getLocationIndex(void) const;
+		size_t				getEffectiveMaxBodySize(void) const;
+		bool				getIsConnected(void) const;
+		const std::string&	getWriteBuffer() const;
 		// no one is using getReq()?
-		Request		getReq(void) const;
+		Request				getReq(void) const;
 		std::chrono::steady_clock::time_point	getLastActivity(void) const;
-		ssize_t		getWriteOffSet() const;
-		bool 		getResponseisReady() const;
-		ClientState getState() const;
+		ssize_t				getWriteOffSet() const;
+		bool 				getResponseisReady() const;
+		ClientState			getState() const;
+		    //CGI
+		pid_t				getCgiPid() const;
+		int					getCgiInputFd() const;
+		int					getCgiOutputFd() const;
+		size_t				getCgiBodyOffset() const;
+		const std::string&	getCgiOutput() const;
+
+
+		void appendCgiOutput(const char* data, size_t size);
+		void clearCgiOutput();
 
 
 		// setters
@@ -64,6 +74,11 @@ class Client
 		void		disConnected(void);
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
+		   ///CGI
+		void	setCgiPid(pid_t pid);
+		void	setCgiInputFd(int fd);
+		void	setCgiOutputFd(int fd);
+		void	setCgiBodyOffset(size_t offset);
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -93,6 +108,11 @@ class Client
 
 	private:
 		int				_fd = -1;
+		pid_t			_cgiPid;
+		int				_cgiInputFd;
+		int				_cgiOutputFd;
+		size_t			_cgiBodyOffset;
+		std::string		_cgiOutput;
 		size_t			_serverIndex;
 		size_t			_locationIndex = static_cast<size_t>(-1);
 		bool			_isConnected = false;
