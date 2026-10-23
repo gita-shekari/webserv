@@ -82,10 +82,14 @@ void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& l
 
 //checkPIDprocess()
 //{
-//	if (the process finished)
+	// result = waitpid()
+//	if (result > 0)
 //	{
+//      readRemainingCGIData(pipefd)
 //		buildCGIResponse();
 //		_state = RESPONSE_READY;
-//		kill the process.
+//		close(pipeFd);
+//		find it in server._pollFd, and make it = -1
+//		remove from server._pipeFds
 //	}
 //}
