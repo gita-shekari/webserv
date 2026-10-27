@@ -1,57 +1,6 @@
 #include "Client.hpp"
+#include "RoutingUtils.hpp"
 
-// helper
-
-bool isMethodAllowed(const LocationConfig& lc, const std::string& method)
-{
-	std::vector<std::string>::const_iterator it = std::find(lc.methods.begin(), lc.methods.end(), method);
-	if (it == lc.methods.end())
-		return false;
-	return true;
-}
-std::string joinPath(const std::string& root, const std::string& path)
-{
-	if (root.empty())
-		return path;
-	if (path.empty())
-		return root;
-
-	bool rootEndsSlash = root[root.size() - 1] == '/';
-	bool pathStartsSlash = path[0] == '/';
-
-	if (rootEndsSlash && pathStartsSlash)
-		return root + path.substr(1);
-	if (!rootEndsSlash && !pathStartsSlash)
-		return root + "/" + path;
-	return root + path;
-}
-
-std::string getCorrectFullPath(const ServerConfig& sc, const LocationConfig& lc, std::string reqPath)
-{
-	if (!lc.root.empty())
-	{
-		std::string relativePath = reqPath;
-		if (relativePath.find(lc.path) == 0)
-			relativePath = relativePath.substr(lc.path.size());
-
-		return joinPath(lc.root, relativePath);
-	}
-	return joinPath(sc.root, reqPath);
-}
-
-bool isCGI(const LocationConfig& lc, const std::string& path)
-{
-	std::string ext;
-	size_t dot = path.find_last_of('.');
-	size_t slash = path.find_last_of('/');
-
-	if (dot == std::string::npos)
-		return false;
-	if (slash != std::string::npos && slash > dot) //if dot belonging to a directory instead of the filename like cgi.file/test
-		return false;
-	ext = path.substr(dot);
-	return (lc.cgi_extension == ext);
-}
 /**
  * @brief Checks whether a requested filesystem path can be handled by the server.
  *
@@ -365,11 +314,11 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 		}
 		if (!lc.index.empty())
 		{
-			std::string indexPath = joinPath(fullPath, lc.index);
+			std::string indexPath = RoutingUtils::joinPath(fullPath, lc.index);
 			struct stat indexBuf;
 			if (!isURIAllowed(&indexBuf, indexPath))
 				return handleErrorResponse(sc, _request.httpStatus);
-			if (isCGI(lc, indexPath))
+			if (RoutingUtils::isCGI(lc, indexPath))
 			{
 				Logger::debug("GET directory index detected as CGI: calling handleCGI");
 				return handleCGI(sc, lc, indexPath);
@@ -385,7 +334,7 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 	}
 	if (S_ISREG(buf.st_mode))
 	{
-		if (isCGI(lc, fullPath))
+		if (RoutingUtils::isCGI(lc, fullPath))
 		{
 			Logger::debug("GET regular file detected as CGI: calling handleCGI");
 			return handleCGI(sc, lc, fullPath);
@@ -408,16 +357,16 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 		}
 		if (!lc.index.empty())
 		{
-			if (isCGI(lc, joinPath(fullPath, lc.index)))
+			if (RoutingUtils::isCGI(lc, RoutingUtils::joinPath(fullPath, lc.index)))
 			{
 				std::cout << "post, path is direc, add index is cgi. handleCGI()" << std::endl;
-				return handleCGI(sc, lc, joinPath(fullPath, lc.index));
+				return handleCGI(sc, lc, RoutingUtils::joinPath(fullPath, lc.index));
 			}
 		}
 	}
 	if (pathAllowed && S_ISREG(buf.st_mode))
 	{
-		if (isCGI(lc, fullPath))
+		if (RoutingUtils::isCGI(lc, fullPath))
 		{
 			std::cout << "post, is cgi. handleCGI()" << std::endl;
 			return handleCGI(sc, lc, fullPath);
@@ -469,10 +418,10 @@ void Client::routing(const ServerConfig& serverConfig)
 	if (lc.has_redirect)
 		return handleRedirect(lc.redirect_code, lc.redirect_target);
 
-	if (!isMethodAllowed(lc, _request.method))
+	if (!RoutingUtils::isMethodAllowed(lc, _request.method))
 		return handleErrorResponse(serverConfig, METHODE_NOT_ALLOWED);
 
-	std::string fullPath = getCorrectFullPath(serverConfig, lc, _request.path);
+	std::string fullPath = RoutingUtils::getCorrectFullPath(serverConfig, lc, _request.path);
 
 	if (_request.method == "GET")
 		return routingGet(serverConfig, lc, fullPath);
