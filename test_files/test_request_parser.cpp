@@ -200,7 +200,7 @@ static void testContentLengthBody(TestRunner& tests)
 
 		ParseStatus status = continueAfterLocation(parser, request, buffer, 4);
 		tests.checkEqual("Content-Length body over configured limit is rejected", ERROR, status);
-		tests.checkEqual("oversized Content-Length body produces 413", PLAYLOAD_TOO_LARGE, request.httpStatus);
+		tests.checkEqual("oversized Content-Length body produces 413", PAYLOAD_TOO_LARGE, request.httpStatus);
 	}
 }
 
@@ -255,7 +255,7 @@ static void testChunkedBody(TestRunner& tests)
 
 		ParseStatus status = continueAfterLocation(parser, request, buffer, 4);
 		tests.checkEqual("chunked body over configured limit is rejected", ERROR, status);
-		tests.checkEqual("oversized chunked body produces 413", PLAYLOAD_TOO_LARGE, request.httpStatus);
+		tests.checkEqual("oversized chunked body produces 413", PAYLOAD_TOO_LARGE, request.httpStatus);
 	}
 }
 
