@@ -1,118 +1,84 @@
 #include "RoutingUtils.hpp"
+#include "TestRunner.hpp"
 
 #include <iostream>
 #include <string>
 
-static int g_passed = 0;
-static int g_failed = 0;
-
-static void checkTrue(const std::string& name, bool condition)
-{
-	if (condition)
-	{
-		g_passed++;
-		std::cout << "[PASS] " << name << std::endl;
-	}
-	else
-	{
-		g_failed ++;
-		std::cout << "[FAIL] " << name << std::endl;
-	}
-}
-
-static void checkEqual(const std::string& name, const std::string& expected, const std::string& actual)
-{
-	if (expected == actual)
-	{
-		g_passed++;
-		std::cout << "[PASS] " << name << std::endl;
-	}
-	else
-	{
-		g_failed ++;
-        std::cerr
-            << "[FAIL] " << name
-            << "\n  expected: " << expected
-            << "\n  actual:   " << actual
-            << '\n';
-	}
-}
-
 /** method at location.methods? methods is empty? lower or upperclass */
-static void testIsMethodAllowed()
+static void testIsMethodAllowed(TestRunner& tests)
 {
 	LocationConfig location;
 
-	checkTrue("empty method list rejects GET", !RoutingUtils::isMethodAllowed(location, "GET"));
+	tests.checkTrue("empty method list rejects GET", !RoutingUtils::isMethodAllowed(location, "GET"));
 
 	location.methods.push_back("GET");
 	location.methods.push_back("POST");
 
-	checkTrue("configed GET allowed", RoutingUtils::isMethodAllowed(location, "GET"));
+	tests.checkTrue("configed GET allowed", RoutingUtils::isMethodAllowed(location, "GET"));
 
-	checkTrue(
+	tests.checkTrue(
         "configured POST is allowed",
         RoutingUtils::isMethodAllowed(location, "POST")
     );
 
-    checkTrue(
+    tests.checkTrue(
         "unconfigured DELETE is rejected",
         !RoutingUtils::isMethodAllowed(location, "DELETE")
     );
 
-    checkTrue(
+    tests.checkTrue(
         "method comparison is case-sensitive",
         !RoutingUtils::isMethodAllowed(location, "get")
     );
 }
 
 /** root empty? path empty? root end with slash? path begin with slash? */
-static void testJoinPath()
+static void testJoinPath(TestRunner& tests)
 {
-	    checkEqual(
+	tests.checkEqual(
         "join normal root and absolute path",
-        "www/index.html",
+        std::string("www/index.html"),
         RoutingUtils::joinPath("www", "/index.html")
     );
 
-    checkEqual(
+    tests.checkEqual(
         "avoid duplicate slash",
-        "www/index.html",
+        std::string("www/index.html"),
         RoutingUtils::joinPath("www/", "/index.html")
     );
 
-    checkEqual(
+    tests.checkEqual(
         "insert missing slash",
-        "www/index.html",
+        std::string("www/index.html"),
         RoutingUtils::joinPath("www", "index.html")
     );
 
-    checkEqual(
+    tests.checkEqual(
         "keep existing separator",
-        "www/index.html",
+        std::string("www/index.html"),
         RoutingUtils::joinPath("www/", "index.html")
     );
 
-    checkEqual(
+    tests.checkEqual(
         "empty root returns path",
-        "/index.html",
+        std::string("/index.html"),
         RoutingUtils::joinPath("", "/index.html")
     );
 
-    checkEqual(
+    tests.checkEqual(
         "empty path returns root",
-        "www",
+        std::string("www"),
         RoutingUtils::joinPath("www", "")
     );
 
-    checkEqual(
+    tests.checkEqual(
         "both empty returns empty",
-        "",
+        std::string(""),
         RoutingUtils::joinPath("", "")
     );
 }
 
-static void testServerRootPath()
+static void testServerRootPath(TestRunner& tests)
 {
 	ServerConfig server;
 	server.root = "/var/www";
@@ -120,9 +86,9 @@ static void testServerRootPath()
 	LocationConfig location;
 	location.path = "/images";
 
-	checkEqual(
+	tests.checkEqual(
 		"use server root when location root is empty",
-        "/var/www/images/logo.png",
+        std::string("/var/www/images/logo.png"),
 		RoutingUtils::getCorrectFullPath(
             server,
             location,
@@ -131,7 +97,7 @@ static void testServerRootPath()
 	);
 }
 
-static void testLocationRootPath()
+static void testLocationRootPath(TestRunner& tests)
 {
     ServerConfig server;
     server.root = "/var/www";
@@ -140,9 +106,9 @@ static void testLocationRootPath()
     location.path = "/images";
     location.root = "/srv/assets";
 
-    checkEqual(
+    tests.checkEqual(
         "location root replaces server root",
-        "/srv/assets/logo.png",
+        std::string("/srv/assets/logo.png"),
         RoutingUtils::getCorrectFullPath(
             server,
             location,
@@ -150,9 +116,9 @@ static void testLocationRootPath()
         )
     );
 
-    checkEqual(
+    tests.checkEqual(
         "exact location path maps to location root",
-        "/srv/assets",
+        std::string("/srv/assets"),
         RoutingUtils::getCorrectFullPath(
             server,
             location,
@@ -161,7 +127,7 @@ static void testLocationRootPath()
     );
 }
 
-static void testRootLocationPath()
+static void testRootLocationPath(TestRunner& tests)
 {
     ServerConfig server;
     server.root = "/var/www";
@@ -170,9 +136,9 @@ static void testRootLocationPath()
     location.path = "/";
     location.root = "/srv/site";
 
-    checkEqual(
+    tests.checkEqual(
         "root location removes leading slash",
-        "/srv/site/index.html",
+        std::string("/srv/site/index.html"),
         RoutingUtils::getCorrectFullPath(
             server,
             location,
@@ -181,21 +147,21 @@ static void testRootLocationPath()
     );
 }
 
-static void testGetCorrectFullPath()
+static void testGetCorrectFullPath(TestRunner& tests)
 {
-    testServerRootPath();
-    testLocationRootPath();
-    testRootLocationPath();
+    testServerRootPath(tests);
+    testLocationRootPath(tests);
+    testRootLocationPath(tests);
 }
 
 
 
-static void testIsCGI()
+static void testIsCGI(TestRunner& tests)
 {
     LocationConfig location;
     location.cgi_extension = ".py";
 
-    checkTrue(
+    tests.checkTrue(
         "matching CGI extension",
         RoutingUtils::isCGI(
             location,
@@ -203,7 +169,7 @@ static void testIsCGI()
         )
     );
 
-    checkTrue(
+    tests.checkTrue(
         "different extension is not CGI",
         !RoutingUtils::isCGI(
             location,
@@ -211,7 +177,7 @@ static void testIsCGI()
         )
     );
 
-    checkTrue(
+    tests.checkTrue(
         "path without extension is not CGI",
         !RoutingUtils::isCGI(
             location,
@@ -219,7 +185,7 @@ static void testIsCGI()
         )
     );
 
-    checkTrue(
+    tests.checkTrue(
         "dot in directory name is not CGI extension",
         !RoutingUtils::isCGI(
             location,
@@ -227,7 +193,7 @@ static void testIsCGI()
         )
     );
 
-    checkTrue(
+    tests.checkTrue(
         "file extension after dotted directory is CGI",
         RoutingUtils::isCGI(
             location,
@@ -235,7 +201,7 @@ static void testIsCGI()
         )
     );
 
-    checkTrue(
+    tests.checkTrue(
         "directory whose name ends in extension is not CGI",
         !RoutingUtils::isCGI(
             location,
@@ -243,7 +209,7 @@ static void testIsCGI()
         )
     );
 
-    checkTrue(
+    tests.checkTrue(
         "CGI extension comparison is case-sensitive",
         !RoutingUtils::isCGI(
             location,
@@ -253,7 +219,7 @@ static void testIsCGI()
 
     location.cgi_extension.clear();
 
-    checkTrue(
+    tests.checkTrue(
         "empty CGI configuration rejects script",
         !RoutingUtils::isCGI(
             location,
@@ -264,15 +230,13 @@ static void testIsCGI()
 
 int main()
 {
-	testIsMethodAllowed();
-	testJoinPath();
-	testGetCorrectFullPath();
-	testIsCGI();
+	TestRunner tests;
 
-	std::cout << "\n"
-			  << g_passed << " passed, "
-			  << g_failed << " failed.\n";
+	testIsMethodAllowed(tests);
+	testJoinPath(tests);
+	testGetCorrectFullPath(tests);
+	testIsCGI(tests);
 	
 	// CI use this to check whether it is success or fail.
-	return g_failed == 0 ? 0 : 1;
+	return tests.finish();
 }

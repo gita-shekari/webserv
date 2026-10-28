@@ -11,20 +11,37 @@ TEST_DIR := test_files
 TEST_BIN_DIR := tests/bin
 
 UNIT_ROUTING_UTIL_BIN := $(TEST_BIN_DIR)/test_routing_utils
+UNIT_URI_UTIL_BIN := $(TEST_BIN_DIR)/test_uri_utils
 
 ### add more unit test bins in here
 UNIT_TEST_BINS := \
-	$(UNIT_ROUTING_UTIL_BIN) 
+	$(UNIT_ROUTING_UTIL_BIN) \
+	$(UNIT_URI_UTIL_BIN) 
 
-$(UNIT_ROUTING_UTIL_BIN): $(TEST_DIR)/test_routing_utils.cpp src/RoutingUtils.cpp include/RoutingUtils.hpp include/Config.hpp
+$(UNIT_ROUTING_UTIL_BIN): \
+		$(TEST_DIR)/test_routing_utils.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		src/RoutingUtils.cpp 
 	mkdir -p $(TEST_BIN_DIR)
 	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_routing_utils.cpp src/RoutingUtils.cpp -o $@
+
+$(UNIT_URI_UTIL_BIN): \
+		$(TEST_DIR)/test_uri_utils.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		src/UriUtils.cpp \
+		src/Http.cpp
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_uri_utils.cpp src/UriUtils.cpp src/Http.cpp -o $@
 
 test-routing-utils: $(UNIT_ROUTING_UTIL_BIN)
 	./$(UNIT_ROUTING_UTIL_BIN)
 
+
+test-uri-utils: $(UNIT_URI_UTIL_BIN)
+	./$(UNIT_URI_UTIL_BIN)
+
 ######## ADD UNIT TESTS #############
-test-unit: test-routing-utils
+test-unit: test-routing-utils test-uri-utils
 
 #### ADD OTHER LAYER OF TEST ####
 test: test-unit
@@ -48,4 +65,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re test test-unit test-routing-utils clean-tests 
+.PHONY: all clean fclean re test test-unit test-routing-utils test-uri-utils clean-tests 
