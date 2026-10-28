@@ -20,6 +20,15 @@ UNIT_TEST_BINS := \
 	$(UNIT_URI_UTIL_BIN) \
 	$(UNIT_REQUEST_PARSER_BIN)
 
+## ---- Targets ---- ##
+all: $(NAME)
+
+$(NAME): $(OBJ)
+	$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
+
 $(UNIT_ROUTING_UTIL_BIN): \
 		$(TEST_DIR)/test_routing_utils.cpp \
 		$(TEST_DIR)/TestRunner.hpp \
@@ -62,14 +71,6 @@ test: test-unit
 
 clean-tests:
 	rm -rf $(TEST_BIN_DIR)
-
-all: $(NAME)
-
-$(NAME): $(OBJ)
-	$(CXX) $(CXXFLAGS) $(OBJ) -o $(NAME)
-
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
 
 clean: clean-tests
 	rm -f $(OBJ)
