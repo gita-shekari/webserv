@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push: ["jdong"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    name: Build with GCC
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@4
+      
+      - name: Build webserv
+        run: make CXX=g++
+
+  unit-tests:
+    name: Unit tests with GCC
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@4
+      
+      - name: Run all unit tests
+        run: make test-unit CXX=g++
