@@ -93,5 +93,5 @@ void	Server::checkTimeouts(void)
 
 const char* Server::ServerException::what() const noexcept
 {
-	return "error";
+	return "";
 }

@@ -24,18 +24,10 @@ Server::~Server(void)
 }
 
 // do we need to return as int?
-int Server::start(void)
+void Server::start(void)
 {
-	try
-	{
-		setListeningSockets(); // error happen will throw exception
-		runningLoop();
-	}
-	catch(const std::exception& e)
-	{
-		return 1;
-	}
-	return 0;
+	setListeningSockets();
+	runningLoop();
 }
 
 bool	Server::setNonBlocking(int fd)
@@ -46,7 +38,7 @@ bool	Server::setNonBlocking(int fd)
 	{
 		const int	saveErr = errno;
 		Logger::systemError(
-			Logger::ERROR,
+			Logger::FATAL,
 			"fcntl F_GETFL failed",
 			saveErr
 		);
@@ -57,7 +49,7 @@ bool	Server::setNonBlocking(int fd)
 	{
 		const int	saveErr = errno;
 		Logger::systemError(
-			Logger::ERROR,
+			Logger::FATAL,
 			"fcntl F_SETFL O_NONBLOCK failed",
 			saveErr
 		);
@@ -103,13 +95,20 @@ bool	Server::handlePollException(int fd, short revents)
 		Logger::fatal("event registry invariant violated: fd has no valid owner");
 		throw ServerException();
 	}
+	if (isListeningFd(fd))
+	{
+		std::string event;
+		if (revents & POLLNVAL)
+			event = "POLLNVAL";
+		else if (revents & POLLERR)
+			event = "POLLERR";
+		else
+			event = "POLLHUP";
+		Logger::fatal("listening socket reported at poll() as " + event + ".\n");
+		throw ServerException();
+	}
 	if (revents & POLLNVAL)
 	{
-		if (isListeningFd(fd))
-		{
-			Logger::fatal("listening socket reported POLLNVAL");
-			throw ServerException();
-		}
 		Logger::error("poll returned POLLNVAL: invalid registered fd="
 			+ std::to_string(fd) + " action=close_client");
 		markForClose(fd);
@@ -117,11 +116,6 @@ bool	Server::handlePollException(int fd, short revents)
 	}
 	if (revents & POLLERR)
 	{
-		if (isListeningFd(fd))
-		{
-			Logger::fatal("listening socket reported POLLERR");
-			throw ServerException();
-		}
 		Logger::warning("client socket reported POLLERR: fd="
 			+ std::to_string(fd) + " action=close_client");
 		markForClose(fd);
@@ -129,11 +123,6 @@ bool	Server::handlePollException(int fd, short revents)
 	}
 	if (revents & POLLHUP)
 	{
-		if (isListeningFd(fd))
-		{
-			Logger::fatal("listening socket reported POLLHUP");
-			throw ServerException();
-		}
 		Logger::info("client socket hangup: fd="
 			+ std::to_string(fd) + " action=close_client");
 		markForClose(fd);

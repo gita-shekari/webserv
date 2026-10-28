@@ -28,7 +28,7 @@ class Server
 		// system methods
 		Server(const std::vector<ServerConfig>& config);
 		~Server(void);
-		int		start(void);
+		void		start(void);
 		void	runningLoop(void);
 		void 	handlePollCallError(int& eagainCount);
 		bool	handlePollException(int fd, short revents);

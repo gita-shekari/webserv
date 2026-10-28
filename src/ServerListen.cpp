@@ -5,7 +5,7 @@
 // for closing socket
 #include <unistd.h>
 
-// not used?
+// TODO: to delete -> not used?
 void	Server::validateUniquePorts(void) const
 {
 	for (size_t i = 0; i < _config.size(); ++i)
@@ -33,7 +33,6 @@ int		Server::createListeningSocket(const ServerConfig& config)
 {
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	//AF_INET : IPv4 protocol SOCK_STREAM: TCP socket
-	// this is for linux, do we need to write a seperate one for windows? how to decide which one to use?
 
 	if (fd == -1)
 	{
