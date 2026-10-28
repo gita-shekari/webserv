@@ -75,7 +75,7 @@ void Client::handleErrorResponse(const ServerConfig& sc, HttpStatus code)
  *
  * @return true if the entry is a directory, otherwise false.
  */
-bool Client::isDirectoryEntry(const std::string& fullPath, const std::string& name)
+bool isDirectoryEntry(const std::string& fullPath, const std::string& name)
 {
 	std::string entryPath = fullPath;
 
@@ -104,7 +104,7 @@ bool Client::isDirectoryEntry(const std::string& fullPath, const std::string& na
  *
  * @return true if the directory is read successfully, otherwise false.
  */
-bool Client::readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries)
+bool readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries)
 {
 	while (true)
 	{
@@ -126,17 +126,6 @@ bool Client::readDirectoryEntries(DIR* dir, const std::string& fullPath, std::ve
 	return true;
 }
 
-void Client::handleDirectoryOpenError(const ServerConfig& serverConfig)
-{
-	int saveErr = errno;
-
-	if (saveErr == EACCES || saveErr == ELOOP)
-		handleErrorResponse(serverConfig, FORBIDDEN);
-	else if (saveErr == ENOENT || saveErr == ENOTDIR)
-		handleErrorResponse(serverConfig, PAGE_NOT_FOUND);
-	else
-		handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
-}
 /**
  * @brief Generates an autoindex response for a directory.
  *
@@ -155,8 +144,14 @@ void Client::handleDirectoryListing(const ServerConfig& serverConfig, const std:
 	DIR* dir = opendir(fullPath.c_str());
 	if (dir == NULL)
 	{
-		Logger::debug("opendir failed: path=" + fullPath);
-		handleDirectoryOpenError(serverConfig);
+		Logger::error("opendir failed: path=" + fullPath);
+		int saveErr = errno;
+		if (saveErr == EACCES || saveErr == ELOOP)
+			handleErrorResponse(serverConfig, FORBIDDEN);
+		else if (saveErr == ENOENT || saveErr == ENOTDIR)
+			handleErrorResponse(serverConfig, PAGE_NOT_FOUND);
+		else
+			handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 		return;
 	}
 	std::vector<std::string> entries;
@@ -217,7 +212,7 @@ void Client::handleDelete(const ServerConfig& serverConfig, const std::string& f
 	if (unlink(filePath.c_str()) == -1)
 	{
 		const int saveErr = errno;
-		Logger::debug("delete failed: path=" + filePath + ", errno=" + std::to_string(saveErr));
+		Logger::error("delete failed: path=" + filePath + ", errno=" + std::to_string(saveErr));
 		if (saveErr == EACCES || saveErr == EPERM
 			|| saveErr == EISDIR || saveErr == EROFS
 			|| saveErr == EBUSY || saveErr == ELOOP)
@@ -352,14 +347,14 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 	{
 		if (!_request.path.empty() && _request.path[_request.path.size() - 1] != '/')
 		{
-			std::cout << "redirect post directory no /: code 307" << std::endl;
+			Logger::debug("redirect post directory no /: code 307");
 			return handleRedirect(307, _request.path + '/');
 		}
 		if (!lc.index.empty())
 		{
 			if (RoutingUtils::isCGI(lc, RoutingUtils::joinPath(fullPath, lc.index)))
 			{
-				std::cout << "post, path is direc, add index is cgi. handleCGI()" << std::endl;
+				Logger::debug("post, path is direc, add index is cgi. handleCGI()");
 				return handleCGI(sc, lc, RoutingUtils::joinPath(fullPath, lc.index));
 			}
 		}
