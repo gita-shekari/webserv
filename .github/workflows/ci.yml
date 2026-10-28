@@ -1,7 +1,7 @@
 name: CI
 
 on:
-  push: ["jdong"]
+  push:
   pull_request:
     branches: ["main"]
 
