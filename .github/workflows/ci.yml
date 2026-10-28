@@ -10,20 +10,32 @@ jobs:
     name: Build with GCC
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        compiler:
+          - g++
+          - clang++
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
       - name: Build webserv
-        run: make CXX=g++
+        run: make CXX=${{ matrix.compiler }}
 
   unit-tests:
     name: Unit tests with GCC
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        compiler:
+          - g++
+          - clang++
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
       - name: Run all unit tests
-        run: make test-unit CXX=g++
+        run: make test-unit CXX=${{ matrix.compiler }}
