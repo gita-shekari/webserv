@@ -1,38 +1,44 @@
+#include <algorithm>
+#include <cerrno>
+#include <cstddef>
+#include <dirent.h>
 #include <iostream>
+#include <map>
 #include <string>
 #include <sys/stat.h>
-#include <dirent.h>
-#include <map>
 #include <vector>
 
-enum	HttpStatus
+enum HttpStatus
 {
 	REQ_OK = 200,
-	CREATED = 201,
 	MOVED_PERMANENTLY = 301,
-	BAD_REQ = 400,
+	TEMPORARY_REDIRECT = 307,
 	FORBIDDEN = 403,
 	PAGE_NOT_FOUND = 404,
-	METHODE_NOT_ALLOWED = 405,
-	PLAYLOAD_TOO_LARGE = 413,
-	INTERNAL_SERVER_ERR = 500,
-	NOT_IMPLEMENTED = 501,
-	HTTP_VERSION_NOT_NSUP = 505
+	METHOD_NOT_ALLOWED = 405,
+	INTERNAL_SERVER_ERROR = 500
+};
+
+enum RouteAction
+{
+	ACTION_NONE,
+	ACTION_CONFIG_REDIRECT,
+	ACTION_DIRECTORY_REDIRECT,
+	ACTION_STATIC,
+	ACTION_CGI,
+	ACTION_DIRECTORY_LISTING,
+	ACTION_UPLOAD,
+	ACTION_DELETE,
+	ACTION_ERROR
 };
 
 struct Request
 {
-	std::string	method;
-	std::string rawTarget;
-	std::string	path;
-	std::string	query;
-	HttpStatus	httpStatus = REQ_OK;
-	std::map<std::string, std::string> headers;
-	std::string	body;
+	std::string method;
+	std::string path;
 
-	Request(){};
-	Request(std::string met, std::string pt, HttpStatus htt) 
-		: method(met), path(pt), httpStatus(htt) {}
+	Request(const std::string& requestMethod, const std::string& requestPath)
+		: method(requestMethod), path(requestPath) {}
 };
 
 struct LocationConfig
@@ -40,308 +46,464 @@ struct LocationConfig
 	std::string path;
 	std::vector<std::string> methods;
 	std::string root;
-	size_t 		client_max_body_size; 
-	bool 		has_client_max_body_size;
-
 	std::string index;
-	bool 		autoindex = false;
-	std::string upload_store;
+	bool autoindex;
+	std::string uploadStore;
 	std::map<std::string, std::string> cgiHandlers;
-	bool 		redirectEnabled = false;
-	int 		redirectStatus = 0;
+	bool redirectEnabled;
+	int redirectStatus;
 	std::string redirectTarget;
 
-	LocationConfig(std::string idx, std::vector<std::string> mets, bool autoidx, std::string path, bool redirEabled, int redirStatus, std::string redirTar, std::string root, std::string up_store)
-		: index(idx), methods(mets), autoindex(autoidx), path(path), redirectEnabled(redirEabled), redirectStatus(redirStatus), redirectTarget(redirTar), upload_store(up_store) {}
+	LocationConfig()
+		: autoindex(false), redirectEnabled(false), redirectStatus(0) {}
 };
 
 struct ServerConfig
 {
-	int port = 0;
-	std::string root = "";
-	std::string index = "";
-	std::string error_page;
-	std::vector<LocationConfig> locations;
+	std::string root;
 };
 
-
-class TestClient
+struct RouteResult
 {
-	public:
-		TestClient(size_t lcIdx, Request& req);
-		bool isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path);
-		
+	RouteAction action;
+	int status;
+	std::string target;
+	std::vector<std::string> entries;
 
-		void	handleDirectory(const ServerConfig& serverConfig, std::string& fullPath);
-		void routing(const ServerConfig& serverConfig);
-
-		void handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath);
-		// handleRedirect()
-		// handleStatic()
-		// handleCGI()
-	private:
-		size_t			_locationIndex = static_cast<size_t>(0);
-		Request			_request; //current request
+	RouteResult()
+		: action(ACTION_NONE), status(REQ_OK) {}
 };
 
-TestClient::TestClient(size_t lcIdx, Request& req)
+static std::string joinPath(const std::string& root, const std::string& path)
 {
-	_locationIndex = lcIdx;
-	_request = req;
-}
-// from here is functions that will be needed.
-std::string	toLower(const std::string& str)
-{
-	std::string	ret = str;
-	for (size_t i = 0; i < ret.size(); ++i)
-		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
-	return ret;
-}
-// helper
-bool isCGI(const ServerConfig& serverConfig, const std::string& path)
-{
-	std::string ext;
-	size_t idx = path.size() - 1;
+	if (root.empty())
+		return path;
+	if (path.empty())
+		return root;
 
-	while (idx >= 0)
-	{
-		if (path[idx] == '.')
-			break;
-		ext += path[idx];
-		idx--;
-	}
-	// TODO: should I make sure idx != 0? because we are sure it won't happen. 
-	std::reverse(ext.begin(), ext.end());
-	if (ext == "py" || ext == "php")
-		return true;
-	else 
+	const bool rootEndsSlash = root[root.size() - 1] == '/';
+	const bool pathStartsSlash = path[0] == '/';
+
+	if (rootEndsSlash && pathStartsSlash)
+		return root + path.substr(1);
+	if (!rootEndsSlash && !pathStartsSlash)
+		return root + "/" + path;
+	return root + path;
+}
+
+static bool endsWithSlash(const std::string& path)
+{
+	return !path.empty() && path[path.size() - 1] == '/';
+}
+
+static bool isMethodAllowed(const LocationConfig& location,
+							const std::string& method)
+{
+	return std::find(location.methods.begin(), location.methods.end(), method)
+		!= location.methods.end();
+}
+
+static bool isCgi(const LocationConfig& location, const std::string& path)
+{
+	const size_t dot = path.find_last_of('.');
+	const size_t slash = path.find_last_of('/');
+
+	if (dot == std::string::npos)
 		return false;
-}
-
-// this function is a client class util
-bool TestClient::isURIAllowed(const ServerConfig& serverConfig, struct stat* buf, std::string path)
-{
-	if (stat(path.c_str(), buf) == -1)
-	{
-		int	saveErr = errno;
-		if (saveErr == ENOENT || saveErr == ENOTDIR)
-		{
-			_request.httpStatus = PAGE_NOT_FOUND;
-			std::cout << "page not found" << std::endl;
-		}
-		else if (saveErr == EACCES)
-		{
-			_request.httpStatus = FORBIDDEN;
-			std::cout << "access forbidden" << std::endl;
-		}
-		else
-		{
-			_request.httpStatus = INTERNAL_SERVER_ERR;
-			std::cout << "others internal error" << std::endl;
-		}
+	if (slash != std::string::npos && slash > dot)
 		return false;
-	}
-	if (!S_ISREG(buf->st_mode) && !S_ISDIR(buf->st_mode))
-	{
-		_request.httpStatus = FORBIDDEN;
-		std::cout << "stat success but not dir or reg" << std::endl;
+
+	return location.cgiHandlers.find(path.substr(dot))
+		!= location.cgiHandlers.end();
+}
+
+static int inspectPath(const std::string& path, struct stat& info)
+{
+	if (stat(path.c_str(), &info) == 0)
+		return REQ_OK;
+	if (errno == ENOENT || errno == ENOTDIR)
+		return PAGE_NOT_FOUND;
+	if (errno == EACCES || errno == ELOOP)
+		return FORBIDDEN;
+	return INTERNAL_SERVER_ERROR;
+}
+
+static bool listDirectory(const std::string& path,
+						  std::vector<std::string>& entries)
+{
+	DIR* directory = opendir(path.c_str());
+	if (directory == NULL)
 		return false;
+
+	while (true)
+	{
+		errno = 0;
+		struct dirent* entry = readdir(directory);
+		if (entry == NULL)
+		{
+			const int readError = errno;
+			closedir(directory);
+			return readError == 0;
+		}
+
+		const std::string name(entry->d_name);
+		if (!name.empty() && name[0] == '.')
+			continue;
+		entries.push_back(name);
 	}
-	return true;
 }
 
-void TestClient::handleDirectoryListing(const ServerConfig& serverConfig, std::string& fullPath)
+class TestRouter
 {
-	DIR *dir = opendir(fullPath.c_str());
-			
-	if (dir != NULL)
+public:
+	RouteResult route(const ServerConfig& server,
+					  const LocationConfig& location,
+					  const Request& request) const
 	{
-		std::vector<std::string> list;
-		std::cout << "before readdir loop \n" << std::endl;
-		struct dirent *ent;
-		while(true)
+		RouteResult result;
+
+		if (location.redirectEnabled)
 		{
-			errno = 0;
-			ent = readdir(dir);
-			if (ent == NULL)
+			result.action = ACTION_CONFIG_REDIRECT;
+			result.status = location.redirectStatus;
+			result.target = location.redirectTarget;
+			return result;
+		}
+
+		if (!isMethodAllowed(location, request.method))
+			return errorResult(METHOD_NOT_ALLOWED);
+
+		const std::string root = location.root.empty()
+			? server.root : location.root;
+		const std::string fullPath = joinPath(root, request.path);
+
+		if (request.method == "GET")
+			return routeGet(location, request, fullPath);
+		if (request.method == "POST")
+			return routePost(location, request, fullPath);
+		if (request.method == "DELETE")
+			return routeDelete(fullPath);
+
+		return errorResult(METHOD_NOT_ALLOWED);
+	}
+
+private:
+	static RouteResult errorResult(int status)
+	{
+		RouteResult result;
+		result.action = ACTION_ERROR;
+		result.status = status;
+		return result;
+	}
+
+	static RouteResult actionResult(RouteAction action,
+								int status,
+								const std::string& target)
+	{
+		RouteResult result;
+		result.action = action;
+		result.status = status;
+		result.target = target;
+		return result;
+	}
+
+	RouteResult routeGet(const LocationConfig& location,
+						 const Request& request,
+						 const std::string& fullPath) const
+	{
+		struct stat info;
+		const int status = inspectPath(fullPath, info);
+		if (status != REQ_OK)
+			return errorResult(status);
+
+		if (S_ISREG(info.st_mode))
+		{
+			if (isCgi(location, fullPath))
+				return actionResult(ACTION_CGI, REQ_OK, fullPath);
+			return actionResult(ACTION_STATIC, REQ_OK, fullPath);
+		}
+
+		if (!S_ISDIR(info.st_mode))
+			return errorResult(FORBIDDEN);
+
+		if (!endsWithSlash(request.path))
+			return actionResult(ACTION_DIRECTORY_REDIRECT,
+				MOVED_PERMANENTLY, request.path + "/");
+
+		if (!location.index.empty())
+		{
+			const std::string indexPath = joinPath(fullPath, location.index);
+			if (isCgi(location, indexPath))
+				return actionResult(ACTION_CGI, REQ_OK, indexPath);
+			return actionResult(ACTION_STATIC, REQ_OK, indexPath);
+		}
+
+		if (!location.autoindex)
+			return errorResult(FORBIDDEN);
+
+		RouteResult result = actionResult(
+			ACTION_DIRECTORY_LISTING, REQ_OK, fullPath);
+		if (!listDirectory(fullPath, result.entries))
+			return errorResult(INTERNAL_SERVER_ERROR);
+		std::sort(result.entries.begin(), result.entries.end());
+		return result;
+	}
+
+	RouteResult routePost(const LocationConfig& location,
+						  const Request& request,
+						  const std::string& fullPath) const
+	{
+		struct stat info;
+		const int status = inspectPath(fullPath, info);
+
+		if (status == REQ_OK && S_ISDIR(info.st_mode))
+		{
+			if (!endsWithSlash(request.path))
+				return actionResult(ACTION_DIRECTORY_REDIRECT,
+					TEMPORARY_REDIRECT, request.path + "/");
+
+			if (!location.index.empty())
 			{
-				if (errno != 0)
-				{
-					int saveErr = errno;
-					_request.httpStatus = INTERNAL_SERVER_ERR;
-					if (closedir(dir) == -1)
-					{
-						std::cout << "closedir failed at " << fullPath << std::endl;
-						//Logger::error("closedir failed for " + fullPath + ": " + std::strerror(closeErr));
-					};
-					return ; //_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-				}
-				break;
-			}
-			std::string name(ent->d_name);
-			if (!name.empty() && name[0] == '.') // skip hidden files.
-				continue;
-			list.push_back(name);
-		}
-		if (closedir(dir) == -1)
-			std::cout << "closedir failed at " << fullPath << std::endl; // change to logger
-		std::cout << "Listing Directory" << std::endl;
-		for (int i = 0; i < list.size(); i++)
-			std::cout << list[i] << std::endl;
-		// buildListingResponse(list);
-	}
-	else
-	{
-		int saveErr = errno;
-		if (saveErr == EACCES || saveErr == ELOOP)
-			_request.httpStatus = FORBIDDEN;
-		else if (saveErr == ENOENT || saveErr == ENOTDIR)
-			_request.httpStatus = PAGE_NOT_FOUND;
-		else
-			_request.httpStatus = INTERNAL_SERVER_ERR;
-		std::cout << "opendir erro. status code = " << _request.httpStatus << std::endl;
-		return ; // buildErrorRepsonse();
-	}
-}
-
-void TestClient::handleDirectory(const ServerConfig& serverConfig, std::string& fullPath)
-{
-	const LocationConfig lc = serverConfig.locations[_locationIndex];
-
-	if (toLower(_request.method) == "get")
-	{
-		if (!lc.index.empty())
-		{
-			if (isCGI(serverConfig, fullPath + lc.index))
-			{
-				std::cout << "in handle directory: is CGI going to run cgi" << std::endl;
-				return ;// handleCGI();
-			}
-			else
-			{
-				std::cout << "in handle direcotyr: not CGI going to run static" << std::endl;
-				return ;//handleStatic()
+				const std::string indexPath = joinPath(fullPath, location.index);
+				if (isCgi(location, indexPath))
+					return actionResult(ACTION_CGI, REQ_OK, indexPath);
 			}
 		}
-		// index is empty
-		if (!lc.autoindex)
+		else if (status == REQ_OK && S_ISREG(info.st_mode))
 		{
-			_request.httpStatus = FORBIDDEN;
-			//_builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-			std::cout << "location config has no index and no autoindex" << std::endl;
-			return ;
+			if (isCgi(location, fullPath))
+				return actionResult(ACTION_CGI, REQ_OK, fullPath);
 		}
-		else
-			handleDirectoryListing(serverConfig, fullPath);
+		else if (status == REQ_OK)
+		{
+			return errorResult(FORBIDDEN);
+		}
+
+		if (!location.uploadStore.empty())
+			return actionResult(ACTION_UPLOAD, REQ_OK, location.uploadStore);
+
+		if (status != REQ_OK)
+			return errorResult(status);
+		return errorResult(FORBIDDEN);
 	}
 
-	// if req method is POST
-	if (toLower(_request.method) == "post")
+	RouteResult routeDelete(const std::string& fullPath) const
 	{
-		if (!lc.index.empty() && isCGI(serverConfig, fullPath + lc.index))
-		{
-			std::cout << "POST: index is cgi " << std::endl;
-			return ; // handleCGI();
-		}
-		if (!lc.upload_store.empty())
-		{
-			return ;//handleUpload();
-		}
-		else
-		{
-			_request.httpStatus = FORBIDDEN;
-			return ; // buildErrorReponse();
-		}
+		struct stat info;
+		const int status = inspectPath(fullPath, info);
+		if (status != REQ_OK)
+			return errorResult(status);
+		if (!S_ISREG(info.st_mode))
+			return errorResult(FORBIDDEN);
+		return actionResult(ACTION_DELETE, REQ_OK, fullPath);
 	}
-	// if req method is DELETE
-	if (toLower(_request.method) == "delete")
+};
+
+static std::string findFixtureRoot()
+{
+	const char* candidates[] = {
+		"test_files/test_routing/fixtures/www",
+		"fixtures/www"
+	};
+
+	for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i)
 	{
-		_request.httpStatus = FORBIDDEN;
-		return ; // buildErrorReponse();
+		struct stat info;
+		if (stat(candidates[i], &info) == 0 && S_ISDIR(info.st_mode))
+			return candidates[i];
 	}
+	return "";
 }
 
-
-
-void TestClient::routing(const ServerConfig& serverConfig)
+static LocationConfig baseLocation()
 {
-	std::string root = serverConfig.root;
-	const LocationConfig lc = serverConfig.locations[_locationIndex];
-	if (lc.root.size() != 0)
-		root = lc.root;
-	std::string filesystemPath = root + _request.path;
-	std::cout << "file path: " + filesystemPath << std::endl;
-	struct stat buf;
-	std::vector<std::string>::const_iterator it = std::find(lc.methods.begin(), lc.methods.end(), toLower(_request.method));
-	if (it == lc.methods.end())
-		_request.httpStatus = METHODE_NOT_ALLOWED;
-	if(_request.httpStatus != REQ_OK || !isURIAllowed(serverConfig, &buf, filesystemPath))
-	{
-		//_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-		std::cout << "http status is has errors" << std::endl;
-		return ;
-	}			
+	LocationConfig location;
+	location.path = "/";
+	location.methods.push_back("GET");
+	location.methods.push_back("POST");
+	location.methods.push_back("DELETE");
+	return location;
+}
 
-	if (S_ISDIR(buf.st_mode))
+static bool contains(const std::vector<std::string>& entries,
+					 const std::string& expected)
+{
+	return std::find(entries.begin(), entries.end(), expected) != entries.end();
+}
+
+class TestSuite
+{
+public:
+	TestSuite() : _passed(0), _failed(0) {}
+
+	void check(const std::string& name,
+			   const RouteResult& actual,
+			   RouteAction expectedAction,
+			   int expectedStatus,
+			   const std::string& expectedTarget = "")
 	{
-		// TODO: make sure request.path will never be empty()
-		if (!_request.path.empty() && _request.path[_request.path.size() - 1] == '/')
+		const bool passed = actual.action == expectedAction
+			&& actual.status == expectedStatus
+			&& (expectedTarget.empty() || actual.target == expectedTarget);
+
+		if (passed)
 		{
-			return handleDirectory(serverConfig, filesystemPath);// handle directory
+			++_passed;
+			std::cout << "[PASS] " << name << "\n";
 		}
 		else
 		{
-			std::cout << "coming soon: handleRedirect(301)" << std::endl;
-			return ; //handleRedirect(301, _request.path + '/', serverConfig)// handle redirect and add / to the end;
+			++_failed;
+			std::cout << "[FAIL] " << name
+				<< " action=" << actual.action
+				<< " status=" << actual.status
+				<< " target=" << actual.target << "\n";
 		}
 	}
-	if (S_ISREG(buf.st_mode))
+
+	void checkCondition(const std::string& name, bool condition)
 	{
-		if (isCGI(serverConfig, _request.path))
+		if (condition)
 		{
-			std::cout << "is CGI going to run cgi" << std::endl;
-			// handleCGI();
+			++_passed;
+			std::cout << "[PASS] " << name << "\n";
 		}
 		else
 		{
-			std::cout << " is static going ot run static" << std::endl;
-			// handleStatic();
+			++_failed;
+			std::cout << "[FAIL] " << name << "\n";
 		}
 	}
-}
 
+	int finish() const
+	{
+		std::cout << "\n" << _passed << " passed, "
+			<< _failed << " failed\n";
+		return _failed == 0 ? 0 : 1;
+	}
 
-void initServerConfig(struct ServerConfig& sc)
+private:
+	int _passed;
+	int _failed;
+};
+
+int main()
 {
-	sc.index = "";
-	sc.root = "fixtures/www";
-}
+	const std::string fixtureRoot = findFixtureRoot();
+	if (fixtureRoot.empty())
+	{
+		std::cerr << "Cannot find test_files/test_routing/fixtures/www\n";
+		return 2;
+	}
 
-int main(void)
-{
-	struct ServerConfig	sc;
-	initServerConfig(sc);
-	
-	// check directory listing 
-	struct LocationConfig lc("", {"get"}, true, "/listing", false, -1, "", "", "");
-	sc.locations.push_back(lc);
-	struct Request req_tailed("get", "/listing/", REQ_OK);
-	struct Request req_notailed("get", "/listing", REQ_OK);
+	ServerConfig server;
+	server.root = fixtureRoot;
+	TestRouter router;
+	TestSuite tests;
 
+	LocationConfig listing = baseLocation();
+	listing.autoindex = true;
+	RouteResult result = router.route(server, listing, Request("GET", "/listing/"));
+	tests.check("GET directory listing", result,
+		ACTION_DIRECTORY_LISTING, REQ_OK,
+		joinPath(fixtureRoot, "/listing/"));
+	tests.checkCondition("listing contains alpha.txt",
+		contains(result.entries, "alpha.txt"));
+	tests.checkCondition("listing contains nested directory",
+		contains(result.entries, "nested"));
+	tests.checkCondition("listing contains spaced filename",
+		contains(result.entries, "space name.txt"));
+	tests.checkCondition("listing contains HTML-sensitive filename",
+		contains(result.entries, "<tag>&.txt"));
+	tests.checkCondition("listing hides .hidden.txt",
+		!contains(result.entries, ".hidden.txt"));
 
-	size_t indexToTest = 0;
-	TestClient client(indexToTest, req_tailed);
-	client.routing(sc);
+	tests.check("GET directory without slash", router.route(
+		server, listing, Request("GET", "/listing")),
+		ACTION_DIRECTORY_REDIRECT, MOVED_PERMANENTLY, "/listing/");
 
-	TestClient client2(indexToTest, req_notailed);
-	client2.routing(sc);
+	LocationConfig htmlIndex = baseLocation();
+	htmlIndex.index = "index.html";
+	tests.check("GET static directory index", router.route(
+		server, htmlIndex, Request("GET", "/with_index/")),
+		ACTION_STATIC, REQ_OK,
+		joinPath(fixtureRoot, "/with_index/index.html"));
 
-	//index(idx), methods(mets), autoindex(autoidx), path(path), redirectEnabled(redirEabled), redirectStatus(redirStatus), redirectTarget(redirTar), upload_store(up_store)
-	struct LocationConfig lc1("index.html", {"get"}, true, "/with_index", false, -1, "", "", "");
-	sc.locations.push_back(lc1);
-	indexToTest++;
-	struct Request req_index("get", "/with_index/", REQ_OK);
-	TestClient client3(indexToTest, req_index);
-	client3.routing(sc);
+	LocationConfig cgi = baseLocation();
+	cgi.cgiHandlers[".py"] = "/usr/bin/python3";
+	cgi.index = "index.py";
+	tests.check("GET CGI directory index", router.route(
+		server, cgi, Request("GET", "/cgi_index/")),
+		ACTION_CGI, REQ_OK,
+		joinPath(fixtureRoot, "/cgi_index/index.py"));
+	tests.check("GET direct CGI file", router.route(
+		server, cgi, Request("GET", "/cgi/direct.py")),
+		ACTION_CGI, REQ_OK,
+		joinPath(fixtureRoot, "/cgi/direct.py"));
+	tests.check("GET regular file in CGI location", router.route(
+		server, cgi, Request("GET", "/cgi/plain.txt")),
+		ACTION_STATIC, REQ_OK,
+		joinPath(fixtureRoot, "/cgi/plain.txt"));
 
+	LocationConfig noAutoindex = baseLocation();
+	tests.check("GET directory without index or autoindex", router.route(
+		server, noAutoindex, Request("GET", "/no_autoindex/")),
+		ACTION_ERROR, FORBIDDEN);
+	tests.check("GET missing path", router.route(
+		server, listing, Request("GET", "/missing")),
+		ACTION_ERROR, PAGE_NOT_FOUND);
+
+	tests.check("POST direct CGI", router.route(
+		server, cgi, Request("POST", "/cgi/direct.py")),
+		ACTION_CGI, REQ_OK,
+		joinPath(fixtureRoot, "/cgi/direct.py"));
+	tests.check("POST CGI directory index", router.route(
+		server, cgi, Request("POST", "/cgi_index/")),
+		ACTION_CGI, REQ_OK,
+		joinPath(fixtureRoot, "/cgi_index/index.py"));
+
+	LocationConfig upload = baseLocation();
+	upload.autoindex = true;
+	upload.uploadStore = "test_files/test_routing/fixtures/uploads";
+	tests.check("POST directory without slash", router.route(
+		server, upload, Request("POST", "/listing")),
+		ACTION_DIRECTORY_REDIRECT, TEMPORARY_REDIRECT, "/listing/");
+	tests.check("POST upload to directory endpoint", router.route(
+		server, upload, Request("POST", "/listing/")),
+		ACTION_UPLOAD, REQ_OK, upload.uploadStore);
+	tests.check("POST upload creates missing resource", router.route(
+		server, upload, Request("POST", "/new-resource.txt")),
+		ACTION_UPLOAD, REQ_OK, upload.uploadStore);
+
+	tests.check("DELETE regular file", router.route(
+		server, listing, Request("DELETE", "/delete/remove-me.txt")),
+		ACTION_DELETE, REQ_OK,
+		joinPath(fixtureRoot, "/delete/remove-me.txt"));
+	tests.check("DELETE directory forbidden", router.route(
+		server, listing, Request("DELETE", "/listing/")),
+		ACTION_ERROR, FORBIDDEN);
+	tests.check("DELETE missing path", router.route(
+		server, listing, Request("DELETE", "/missing.txt")),
+		ACTION_ERROR, PAGE_NOT_FOUND);
+
+	LocationConfig getOnly = baseLocation();
+	getOnly.methods.clear();
+	getOnly.methods.push_back("GET");
+	tests.check("disallowed method", router.route(
+		server, getOnly, Request("POST", "/listing/")),
+		ACTION_ERROR, METHOD_NOT_ALLOWED);
+
+	LocationConfig redirect = baseLocation();
+	redirect.redirectEnabled = true;
+	redirect.redirectStatus = MOVED_PERMANENTLY;
+	redirect.redirectTarget = "/new-place";
+	tests.check("configured redirect has priority", router.route(
+		server, redirect, Request("DELETE", "/missing")),
+		ACTION_CONFIG_REDIRECT, MOVED_PERMANENTLY, "/new-place");
+
+	tests.check("CGI-looking directory remains directory", router.route(
+		server, cgi, Request("POST", "/folder.py")),
+		ACTION_DIRECTORY_REDIRECT, TEMPORARY_REDIRECT, "/folder.py/");
+
+	return tests.finish();
 }

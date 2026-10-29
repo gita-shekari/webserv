@@ -1,9 +1,14 @@
 #include "Client.hpp"
+#include <vector>
+#include <algorithm>
+#include <sys/stat.h>
+#include <dirent.h>
 
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
 	  _serverIndex(serverIndex),
 	  _isConnected(true),
+	  _writeOffSet(0),
 	  _lastActivity(std::chrono::steady_clock::now())
 {
 	std::cout << "A client is created fd: " << fd << std::endl;
@@ -14,7 +19,7 @@ Client::~Client(void)
 	std::cout << "fd " << _fd << " is destroyed" << std::endl;
 }
 
-int		Client::getFd(void)
+int		Client::getFd(void) const
 {
 	return _fd;
 }
@@ -34,19 +39,36 @@ size_t	Client::getEffectiveMaxBodySize(void) const
 	return _request.effectiveMaxBodySize;
 }
 
-bool	Client::getIsConnected(void)
+bool	Client::getIsConnected(void) const
 {
 	return _isConnected;
 }
 
-std::string Client::getWriteBuffer()
+const std::string& Client::getWriteBuffer() const
 {
 	return _writeBuffer;
 }
 
-Request	Client::getReq(void)
+Request	Client::getReq(void) const
 {
 	return _request;
+}
+ssize_t Client::getWriteOffSet() const
+{
+	return _writeOffSet;
+}
+
+ClientState Client::getState() const
+{
+	return _state;
+}
+void Client::setState(ClientState st)
+{
+	_state = st;
+}
+void Client::setWriteOffSet(ssize_t byte)
+{
+	_writeOffSet = byte;
 }
 
 std::chrono::steady_clock::time_point	Client::getLastActivity(void) const
@@ -54,10 +76,6 @@ std::chrono::steady_clock::time_point	Client::getLastActivity(void) const
 	return _lastActivity;
 }
 
-void	Client::setRequestPath(const std::string& str)
-{
-	_request.path = str;
-}
 
 void	Client::setEffectiveMaxBodySize(size_t size)
 {
@@ -84,7 +102,7 @@ ParseStatus	Client::parseReadBuffer(void)
 void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 {
 	size_t	longestMatch = 0;
-
+	//TODO: make sure to check if there is no matching location
 	for (size_t i = 0; i < locations.size(); ++i)
 	{
 		const std::string& locationPath = locations[i].path;
@@ -92,16 +110,15 @@ void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 
 		if (length > _request.path.size())
 			continue;
-		
+
 		if (_request.path.compare(0, length, locationPath) != 0)
 			continue;
-		
+
 		bool validBoundary = (length == _request.path.size())
 							|| (locationPath == "/")
 							|| (_request.path[length] == '/');
 		if (!validBoundary)
 			continue;
-		
 		if (length > longestMatch)
 		{
 			longestMatch = length;
@@ -109,7 +126,12 @@ void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 		}
 	}
 }
-
+void Client::prepareResponseForSending()
+{
+	_writeBuffer = _builder.serialize(_response);
+	_writeOffSet = 0;
+	_state = SENDING_RESPONSE;
+}
 //enum	ConfigBehavior
 //{
 //	REDIRECT,

@@ -1,0 +1,9 @@
+POST /search?q=cat HTTP/1.1
+Host: localhost:8080
+User-Agent: TestClient/1.0
+Accept: text/plain
+Content-Type: text/plain
+Content-Length: 11
+Connection: keep-alive
+
+hello world
