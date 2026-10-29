@@ -17,7 +17,7 @@ void	Server::removeMarkedClients(void)
 	std::map<int, Client>::iterator it = _clients.begin();
 	while (it != _clients.end())
 	{
-		if (!it->second.getIsMarkedForClose())
+		if (it->second.getIsMarkedForClose())
 		{
 			int fd = it->first;
 			++it;
@@ -86,6 +86,8 @@ void	Server::closeClient(int clientFd)
 
 	if (it == _clients.end())
 		return ;
+
+	std::cout << "closeClient() called: fd=" << clientFd << std::endl;
 	
 	cleanupCgi(clientFd);
 	removePollFd(clientFd);

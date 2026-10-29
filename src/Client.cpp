@@ -83,7 +83,7 @@ void	Client::setEffectiveMaxBodySize(size_t size)
 
 void	Client::setIsMarkedForClose(void)
 {
-	_isMarkedForClose = false;
+	_isMarkedForClose = true;
 }
 
 void	Client::appendReadBuffer(const char* data, size_t size)
