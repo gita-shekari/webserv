@@ -15,7 +15,7 @@ enum	HttpStatus
 	FORBIDDEN = 403,
 	PAGE_NOT_FOUND = 404,
 	METHODE_NOT_ALLOWED = 405,
-	PLAYLOAD_TOO_LARGE = 413,
+	PAYLOAD_TOO_LARGE = 413,
 	INTERNAL_SERVER_ERR = 500,
 	NOT_IMPLEMENTED = 501,
 	HTTP_VERSION_NOT_NSUP = 505
@@ -51,3 +51,4 @@ struct Response
 	std::map<std::string, std::string>	headers;
 	std::string							body;
 };
+

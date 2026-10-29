@@ -1,69 +1,96 @@
 #include "Server.hpp"
-// for non blocking
-#include <fcntl.h> 
+#include <fcntl.h> // for non blocking
 
 Server::Server(const std::vector<ServerConfig>& config)
-	: _config(config)
+	: _isRunning(false),
+	  _config(config)
 {
 	Logger::debug("server object created");
 }
-// Need server shutdown function.
-Server::~Server(void)
+
+Server::~Server()
 {
-	for (std::map<int, size_t>::iterator it = _listeners.begin();
-		it != _listeners.end();
-		++it)
-		close(it->first);
-	
-	for (std::map<int, Client>::iterator it = _clients.begin();
-		it != _clients.end();
-		++it)
-		close(it->first);
-	// not only close socket, also need to check pullfd and clients in case of throw exception destructor.
+	shutdown();
 	Logger::info("server stopped");
 }
 
-// do we need to return as int?
-int Server::start(void)
+int	Server::start()
 {
 	try
 	{
-		setListeningSockets(); // error happen will throw exception
+		setListeningSockets();
 		runningLoop();
 	}
-	catch(const std::exception& e)
+	catch (const std::exception& e)
 	{
+		Logger::error(e.what());
+		shutdown();
 		return 1;
 	}
+	shutdown();
 	return 0;
 }
 
-bool	Server::setNonBlocking(int fd)
+void	Server::runningLoop(void)
 {
-	int flags = fcntl(fd, F_GETFL, 0);
+	int	eagainCount = 0;
 
-	if (flags == -1)
+	while (_isRunning)
 	{
-		const int	saveErr = errno;
-		Logger::systemError(
-			Logger::ERROR,
-			"fcntl F_GETFL failed",
-			saveErr
-		);
-		return false;
-	}
+		const size_t polledFdCount = _pollfds.size();
+		if (polledFdCount == 0)
+			continue;
+		// because the size might change since accpet new fds push back in to _pollfds;
+		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
 
-	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-	{
-		const int	saveErr = errno;
-		Logger::systemError(
-			Logger::ERROR,
-			"fcntl F_SETFL O_NONBLOCK failed",
-			saveErr
-		);
-		return false;
+		if (res == -1)
+		{
+			handlePollCallError(eagainCount);
+			continue;
+		}
+
+		eagainCount = 0;
+
+		if (res > 0)
+		{
+			for (size_t i = 0; i < polledFdCount; i++)
+			{
+				short revents = _pollfds[i].revents;
+				int fd = _pollfds[i].fd;
+
+				if (revents == 0)
+					continue;
+
+				if (handlePollException(fd, revents))
+					continue;
+
+				if (isListeningFd(fd))
+				{
+					if (revents & POLLIN)
+						acceptNewClient(fd);
+					continue;
+				}
+
+				// TODO: to be created
+				if (isCgiPipeFd(fd))
+				{
+					handleCgiPipeEvent(_pollfds[i], revents);
+					continue;
+				}
+
+				if (!isClientFd(fd))
+					continue;
+
+				Client& client = getClient(fd);
+				handleEvent(_pollfds[i], revents, client);
+			}
+		}
+		//
+		//TODO:: checkCgiProcesses();
+		checkTimeouts();
+		//todo: check how the macro works with revents.
+		removeMarkedClients();
 	}
-	return true;
 }
 
 void	Server::handlePollCallError(int& eagainCount)
@@ -97,18 +124,26 @@ bool	Server::handlePollException(int fd, short revents)
 {
 	if (!(revents & (POLLNVAL | POLLERR | POLLHUP)))
 		return false; // no exceptions found, continue with runningLoop()
+	// TODO: This need to be changed. because it might be the pipefd. 
 	if (!isListeningFd(fd) && !isClientFd(fd))
 	{
 		Logger::fatal("event registry invariant violated: fd has no valid owner");
 		throw ServerException();
 	}
+	if (isListeningFd(fd))
+	{
+		std::string event;
+		if (revents & POLLNVAL)
+			event = "POLLNVAL";
+		else if (revents & POLLERR)
+			event = "POLLERR";
+		else
+			event = "POLLHUP";
+		Logger::fatal("listening socket reported at poll() as " + event + ".\n");
+		throw ServerException();
+	}
 	if (revents & POLLNVAL)
 	{
-		if (isListeningFd(fd))
-		{
-			Logger::fatal("listening socket reported POLLNVAL");
-			throw ServerException();
-		}
 		Logger::error("poll returned POLLNVAL: invalid registered fd="
 			+ std::to_string(fd) + " action=close_client");
 		markForClose(fd);
@@ -116,11 +151,6 @@ bool	Server::handlePollException(int fd, short revents)
 	}
 	if (revents & POLLERR)
 	{
-		if (isListeningFd(fd))
-		{
-			Logger::fatal("listening socket reported POLLERR");
-			throw ServerException();
-		}
 		Logger::warning("client socket reported POLLERR: fd="
 			+ std::to_string(fd) + " action=close_client");
 		markForClose(fd);
@@ -128,17 +158,40 @@ bool	Server::handlePollException(int fd, short revents)
 	}
 	if (revents & POLLHUP)
 	{
-		if (isListeningFd(fd))
-		{
-			Logger::fatal("listening socket reported POLLHUP");
-			throw ServerException();
-		}
 		Logger::info("client socket hangup: fd="
 			+ std::to_string(fd) + " action=close_client");
 		markForClose(fd);
 		return true;
 	}
 	return false;
+}
+
+bool	Server::setNonBlocking(int fd)
+{
+	int flags = fcntl(fd, F_GETFL, 0);
+
+	if (flags == -1)
+	{
+		const int	saveErr = errno;
+		Logger::systemError(
+			Logger::FATAL,
+			"fcntl F_GETFL failed",
+			saveErr
+		);
+		return false;
+	}
+
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+	{
+		const int	saveErr = errno;
+		Logger::systemError(
+			Logger::FATAL,
+			"fcntl F_SETFL O_NONBLOCK failed",
+			saveErr
+		);
+		return false;
+	}
+	return true;
 }
 
 void	Server::addPollFds(int fd, short events)
@@ -150,104 +203,23 @@ void	Server::addPollFds(int fd, short events)
 	_pollfds.push_back(socket);
 }
 
-void	Server::runningLoop(void)
+void	Server::checkTimeouts(void)
 {
-	int	eagainCount = 0;
-
-	while (_isRunning)
+	std::chrono::steady_clock::time_point now
+		 = std::chrono::steady_clock::now();
+	for (std::map<int, Client>::iterator it = _clients.begin();
+		it != _clients.end(); ++it)
 	{
-		const size_t polledFdCount = _pollfds.size(); 
-		if (polledFdCount == 0)
-			continue;
-		// because the size might change since accpet new fds push back in to _pollfds;
-		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
-
-		if (res == -1)
+		std::chrono::seconds idleTime =
+			std::chrono::duration_cast<std::chrono::seconds>(
+				now - it->second.getLastActivity());
+		if (idleTime.count() >= CLIENT_TIMEOUT_SEC)
 		{
-			handlePollCallError(eagainCount);
-			continue;
+			Logger::info(
+				"Client timeout: fd=" + std::to_string(it->first)
+				+ " action=close_client"
+			);
+			markForClose(it->first);
 		}
-
-		eagainCount = 0;
-
-		if (res > 0)
-		{
-			for (size_t i = 0; i < polledFdCount; i++)
-			{
-				short revents = _pollfds[i].revents;
-				int fd = _pollfds[i].fd;
-				
-				if (revents == 0)
-					continue;
-
-				if (handlePollException(fd, revents))
-					continue;
-
-				if (isListeningFd(fd))
-				{
-					if (revents & POLLIN)
-						acceptNewClient(fd);
-					continue;
-				}
-
-				// TODO: to be created
-				if (isCgiPipeFd(fd))
-                {
-                    handleCgiPipeEvent(fd, revents);
-                    continue;
-                }
-
-				if (!isClientFd(fd))
-					continue;
-					
-				Client& client = getClient(fd);
-
-				if (revents & POLLIN)
-				{	
-					if (client.getState() == READ_REQ)
-					{
-						if (!receiveClientData(client))
-							continue;
-					}
-					if (client.getState() == REQ_READY)
-					{
-						client.routing(_config[client.getServerIndex()]);
-					}
-					
-					
-					// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
-					//CGI processing
-				}
-				if (client.getState() == RESPONSE_READY)
-				{
-					// build serialize
-					//TODO: to create 
-					enableClientWriteEvent(fd);
-                    client.setState(SENDING_REPSONSE);
-					_pollfds[i].events |= POLLOUT;
-				}
-				if (revents & POLLOUT)
-				{
-					if (client.getState() == SENDING_REPSONSE)
-					{
-						if (!sendClientData(client))
-							continue;
-						
-						// Only disable POLLOUT when the entire response
-                        // has been sent.
-						//TODO: to create
-                        disableClientWriteEvent(fd);
-						_pollfds[i].events &= ~POLLOUT;
-					}
-					// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
-					// if request.headers contains "connection" and "close", mark fd close
-				}
-			}
-		}
-		//
-		checkCgiProcesses();
-		checkTimeouts();
-		// need to remove closed fds from pollFds, also check how the macro works with revents.
-		removeCloseClient();
 	}
 }

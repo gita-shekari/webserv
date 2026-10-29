@@ -159,11 +159,17 @@ int main(int argc, char **argv)
 
 		Server server(configs);
 		server.start();
+		return 0;
+	}
+	catch (const Server::ServerException&)
+	{
+		// reason is being logged at error functions. no logging here.
+		return 1;
 	}
 	catch (const std::exception& e)
 	{
-		Logger::fatal(std::string("server startup failed: ") + e.what());
+		// catch config parsing errors.
+		Logger::fatal(e.what());
 		return 1;
 	}
-	return 0;
 }

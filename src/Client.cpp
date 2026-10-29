@@ -7,7 +7,6 @@
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
 	  _serverIndex(serverIndex),
-	  _isConnected(true),
 	  _writeOffSet(0),
 	  _lastActivity(std::chrono::steady_clock::now())
 {
@@ -39,9 +38,9 @@ size_t	Client::getEffectiveMaxBodySize(void) const
 	return _request.effectiveMaxBodySize;
 }
 
-bool	Client::getIsConnected(void) const
+bool	Client::getIsMarkedForClose() const
 {
-	return _isConnected;
+	return _isMarkedForClose;
 }
 
 const std::string& Client::getWriteBuffer() const
@@ -58,6 +57,14 @@ ssize_t Client::getWriteOffSet() const
 	return _writeOffSet;
 }
 
+ClientState Client::getState() const
+{
+	return _state;
+}
+void Client::setState(ClientState st)
+{
+	_state = st;
+}
 void Client::setWriteOffSet(ssize_t byte)
 {
 	_writeOffSet = byte;
@@ -68,19 +75,15 @@ std::chrono::steady_clock::time_point	Client::getLastActivity(void) const
 	return _lastActivity;
 }
 
-void	Client::setRequestPath(const std::string& str)
-{
-	_request.path = str;
-}
 
 void	Client::setEffectiveMaxBodySize(size_t size)
 {
 	_request.effectiveMaxBodySize = size;
 }
 
-void	Client::disConnected(void)
+void	Client::setIsMarkedForClose(void)
 {
-	_isConnected = false;
+	_isMarkedForClose = true;
 }
 
 void	Client::appendReadBuffer(const char* data, size_t size)
@@ -122,7 +125,12 @@ void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 		}
 	}
 }
-
+void Client::prepareResponseForSending()
+{
+	_writeBuffer = _builder.serialize(_response);
+	_writeOffSet = 0;
+	_state = SENDING_RESPONSE;
+}
 //enum	ConfigBehavior
 //{
 //	REDIRECT,
