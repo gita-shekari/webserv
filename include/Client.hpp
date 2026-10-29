@@ -3,6 +3,7 @@
 # include "Http.hpp"
 # include "RequestParser.hpp"
 # include "ResponseBuilder.hpp"
+#include "CGI.hpp"
 #include <sys/stat.h>
 #include <dirent.h>
 # include <string>
@@ -57,28 +58,16 @@ class Client
 		ssize_t				getWriteOffSet() const;
 		bool 				getResponseisReady() const;
 		ClientState			getState() const;
-		    //CGI
-		pid_t				getCgiPid() const;
-		int					getCgiInputFd() const;
-		int					getCgiOutputFd() const;
-		size_t				getCgiBodyOffset() const;
-		const std::string&	getCgiOutput() const;
-
-
-		void appendCgiOutput(const char* data, size_t size);
-		void clearCgiOutput();
-
+		bool				getCgiPipesRegistered() const;
+		CGI&				getCGI();
+		const CGI&			getCGI() const;
 
 		// setters
 		void		setEffectiveMaxBodySize(size_t size);
 		void		disConnected(void);
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
-		   ///CGI
-		void	setCgiPid(pid_t pid);
-		void	setCgiInputFd(int fd);
-		void	setCgiOutputFd(int fd);
-		void	setCgiBodyOffset(size_t offset);
+		void		setCgiPipesRegistered(bool value);
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -108,18 +97,14 @@ class Client
 
 	private:
 		int				_fd = -1;
-		pid_t			_cgiPid;
-		int				_cgiInputFd;
-		int				_cgiOutputFd;
-		size_t			_cgiBodyOffset;
-		std::string		_cgiOutput;
+		bool			_cgiPipesRegistered;
 		size_t			_serverIndex;
 		size_t			_locationIndex = static_cast<size_t>(-1);
 		bool			_isConnected = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
 		ssize_t			_writeOffSet;
-
+		CGI				_cgi;
 		Request			_request; //current request
 		RequestParser	_parser;
 		Response		_response;

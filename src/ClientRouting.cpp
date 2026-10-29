@@ -204,6 +204,19 @@ void Client::handleDirectoryOpenError(const ServerConfig& serverConfig)
 	else
 		handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 }
+
+
+void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& lc, const std::string& scriptPath)
+{
+	if (!_cgi.start(_request, lc, scriptPath))
+		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
+
+	_cgiPipesRegistered = false;
+	_state = CGI_RUNNING;
+	Logger::debug("CGI started for script: " + scriptPath);
+}
+
+
 /**
  * @brief Generates an autoindex response for a directory.
  *

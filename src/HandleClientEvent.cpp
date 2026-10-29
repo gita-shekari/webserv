@@ -20,7 +20,6 @@ Client& Server::getBelongedClient(int fd)
 	int clientFd = it->second;
 	return (getClient(clientFd));
 }
-
 void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 {
 	if (revents & POLLIN)
@@ -28,61 +27,77 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 		if (client.getState() == READ_REQ)
 		{
 			if (!receiveClientData(client))
-				return ; // continue the loop
+				return;
 		}
 		if (client.getState() == REQ_READY)
-		{
 			client.routing(_config[client.getServerIndex()]);
-		}
-		if (client.getState() == CGI_RUNNING)
-		{
-			registerCgiPipes(client);
-		}
 	}
+
+	if (client.getState() == CGI_RUNNING && !client.getCgiPipesRegistered())
+		registerCgiPipes(client);
+
 	if (client.getState() == RESPONSE_READY)
 	{
 		client.prepareResponseForSending();
 		pfd.events |= POLLOUT;
-
 	}
+
 	if (revents & POLLOUT)
 	{
 		if (client.getState() == SENDING_RESPONSE)
 		{
 			if (!sendClientData(client))
-				return ; // continue the loop
+				return;
 
-			// Only disable POLLOUT when the entire response
-			// has been sent.
-			//TODO: to create
 			pfd.events &= ~POLLOUT;
 		}
-		// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
-		// if request.headers contains "connection" and "close", mark fd close
 	}
 }
 
 void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 {
 	Client& client = getBelongedClient(pfd.fd);
-	if (client.getState() != CGI_RUNNING) // check
-		return handleEvent(pfd, revents, client);
+	if (client.getState() != CGI_RUNNING || !client.getCgiPipesRegistered())
+		return;
+	if (pfd.fd == client.getCGI().getInputFd())
+	{
+		if (revents & POLLOUT)
+		{
+			Logger::debug("CGI input pipe writable: fd=" + std::to_string(pfd.fd));
+			// next: write request body
+		}
+	}
 
-	// TODO:: check whether the pipe is finished.
-	// this function will change client state to RESPONSE_READY or keep it as CGI_RUNNING.
-	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY.
-
+	if (pfd.fd == client.getCGI().getOutputFd())
+	{
+		if (revents & POLLIN)
+		{
+			Logger::debug("CGI output pipe readable: fd=" + std::to_string(pfd.fd));
+			// next: read CGI output
+		}
+	}
 }
 
 void	Server::registerCgiPipes(Client& client)
 {
-	// here I am gonna add pipfd and clientfd to the _pipfd
-	int inputFd = client.getCgiInputFd();
-	int outputFd = client.getCgiOutputFd();
+	int inputFd = client.getCGI().getInputFd();
+	int outputFd = client.getCGI().getOutputFd();
 	int clientFd = client.getFd();
+	if (inputFd == -1 || outputFd == -1)
+	{
+		Logger::error("cannot register CGI pipes: invalid fd");
+		return;
+	}
+	if (!setNonBlocking(inputFd) || !setNonBlocking(outputFd))
+	{
+		Logger::error("cannot register CGI pipes: failed to set non-blocking");
+		return;
+	}
 	_pipeFds[inputFd] = clientFd;
 	_pipeFds[outputFd] = clientFd;
-	//I also need to call this function only once for a request, by adding a flag or sth I now I registerd it already
+	addPollFds(inputFd, POLLOUT);
+	addPollFds(outputFd, POLLIN);
+	client.setCgiPipesRegistered(true);
 	Logger::debug("registered CGI input fd=" + std::to_string(inputFd) + " for client fd=" + std::to_string(clientFd));
 	Logger::debug("registered CGI output fd=" + std::to_string(outputFd) + " for client fd=" + std::to_string(clientFd));
 }

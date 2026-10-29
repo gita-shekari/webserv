@@ -5,10 +5,7 @@
 #include <dirent.h>
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
-	  _cgiPid(-1),
-	  _cgiInputFd(-1),
-	  _cgiOutputFd(-1),
-	  _cgiBodyOffset(0),
+	  _cgiPipesRegistered(false),
 	  _serverIndex(serverIndex),
 	  _isConnected(true),
 	  _writeOffSet(0),
@@ -65,6 +62,15 @@ ClientState Client::getState() const
 {
 	return _state;
 }
+CGI& Client::getCGI()
+{
+	return _cgi;
+}
+
+const CGI& Client::getCGI() const
+{
+	return _cgi;
+}
 void Client::setState(ClientState st)
 {
 	_state = st;
@@ -84,62 +90,16 @@ void	Client::setEffectiveMaxBodySize(size_t size)
 {
 	_request.effectiveMaxBodySize = size;
 }
-////CGI
-pid_t Client::getCgiPid() const
+
+void Client::setCgiPipesRegistered(bool value)
 {
-	return _cgiPid;
+	_cgiPipesRegistered = value;
 }
 
-int Client::getCgiInputFd() const
+bool Client::getCgiPipesRegistered() const
 {
-	return _cgiInputFd;
+	return _cgiPipesRegistered;
 }
-
-int Client::getCgiOutputFd() const
-{
-	return _cgiOutputFd;
-}
-
-size_t Client::getCgiBodyOffset() const
-{
-	return _cgiBodyOffset;
-}
-
-const std::string& Client::getCgiOutput() const
-{
-	return _cgiOutput;
-}
-
-void Client::setCgiPid(pid_t pid)
-{
-	_cgiPid = pid;
-}
-
-void Client::setCgiInputFd(int fd)
-{
-	_cgiInputFd = fd;
-}
-
-void Client::setCgiOutputFd(int fd)
-{
-	_cgiOutputFd = fd;
-}
-
-void Client::setCgiBodyOffset(size_t offset)
-{
-	_cgiBodyOffset = offset;
-}
-
-void Client::appendCgiOutput(const char* data, size_t size)
-{
-	_cgiOutput.append(data, size);
-}
-
-void Client::clearCgiOutput()
-{
-	_cgiOutput.clear();
-}
-///End of CGI getters and setters
 
 void	Client::disConnected(void)
 {
