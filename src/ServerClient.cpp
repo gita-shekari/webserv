@@ -159,3 +159,20 @@ bool Server::sendClientData(Client& client)
 	}
 	return false;
 }
+
+bool	Server::isClientFd(int fd) const
+{
+	return _clients.find(fd) != _clients.end();
+}
+
+Client& Server::getClient(int clientFd)
+{
+	std::map<int, Client>::iterator it = _clients.find(clientFd);
+	if (it == _clients.end())
+	{
+		Logger::fatal("event registry invariant violated: poll fd="
+			+ std::to_string(clientFd) + " has no Client");
+		throw ServerException();
+	}
+	return (it->second);
+}

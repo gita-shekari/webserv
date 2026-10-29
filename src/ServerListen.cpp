@@ -118,3 +118,8 @@ int		Server::createListeningSocket(const ServerConfig& config)
 
 	return fd;
 }
+
+bool	Server::isListeningFd(int fd) const
+{
+	return _listeners.find(fd) != _listeners.end();
+}

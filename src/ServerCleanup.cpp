@@ -3,58 +3,25 @@
 #include <algorithm>
 #include <unistd.h>
 
-// remove an fd from poll registration. Does NOT close the fd.
-void	Server::removePollFd(int fd)
+void	Server::markForClose(int fd)
 {
-	for (std::vector<pollfd>::iterator it = _pollfds.begin();
-		it != _pollfds.end(); )
+	Logger::debug("marking client for close: fd=" + std::to_string(fd));
+	// shouldn't do this because it might create a client if it doent exist;
+	//_clients[fd].Client::setIsMarkedForClose();
+	Client& client = getClient(fd);
+	client.setIsMarkedForClose();
+}
+
+void	Server::removeMarkedClients(void)
+{
+	std::map<int, Client>::iterator it = _clients.begin();
+	while (it != _clients.end())
 	{
-		if (it->fd == fd)
-			it = _pollfds.erase(it);
-		else
-			++it;
-	}
-}
-
-void	Server::closeClient(int clientFd)
-{
-	std::map<int, Client>::iterator it = _clients.find(clientFd);
-
-	if (it == _clients.end())
-		return ;
-	
-	cleanupCgi(clientFd);
-	removePollFd(clientFd); // stop monitoring this client socket
-	close(clientFd);
-	_clients.erase(it);
-}
-
-void	Server::closeListener(int listenerFd)
-{
-	std::map<int, size_t>::iterator it = _listeners.find(listenerFd);
-
-	if (it == _listeners.end())
-		return ;
-	
-	removePollFd(listenerFd);
-	close(listenerFd);
-	_listeners.erase(it);
-}
-
-void	Server::cleanupCgi(int clientFd)
-{
-	std::map<int, int>::iterator it = _pipeFds.begin();
-
-	while (it != _pipeFds.end())
-	{
-		if (it->second == clientFd)
+		if (!it->second.getIsMarkedForClose())
 		{
-			int pipeFd = it->first;
-
-			removePollFd(pipeFd);
-			close(pipeFd);
-
-			it = _pipeFds.erase(it);
+			int fd = it->first;
+			++it;
+			closeClient(fd);
 		}
 		else
 			++it;
@@ -88,9 +55,60 @@ void	Server::shutdown()
 	while (!_listeners.empty())
 	{
 		int listenerFd = _listeners.begin()->first;
-		closeListener(listenerFd);
+		
+		removePollFd(listenerFd);
+		close(listenerFd);
+
+		_listeners.erase(_listeners.begin());
 	}
 
 	//clean poll registration
 	_pollfds.clear();
+}
+
+
+// remove an fd from poll registration. =stop monitoring; Does NOT close the fd.
+void	Server::removePollFd(int fd)
+{
+	for (std::vector<pollfd>::iterator it = _pollfds.begin();
+		it != _pollfds.end(); )
+	{
+		if (it->fd == fd)
+			it = _pollfds.erase(it);
+		else
+			++it;
+	}
+}
+
+void	Server::closeClient(int clientFd)
+{
+	std::map<int, Client>::iterator it = _clients.find(clientFd);
+
+	if (it == _clients.end())
+		return ;
+	
+	cleanupCgi(clientFd);
+	removePollFd(clientFd);
+	close(clientFd);
+	_clients.erase(it);
+}
+
+void	Server::cleanupCgi(int clientFd)
+{
+	std::map<int, int>::iterator it = _pipeFds.begin();
+
+	while (it != _pipeFds.end())
+	{
+		if (it->second == clientFd)
+		{
+			int pipeFd = it->first;
+
+			removePollFd(pipeFd);
+			close(pipeFd);
+
+			it = _pipeFds.erase(it);
+		}
+		else
+			++it;
+	}
 }

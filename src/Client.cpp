@@ -7,7 +7,6 @@
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
 	  _serverIndex(serverIndex),
-	  _isConnected(true),
 	  _writeOffSet(0),
 	  _lastActivity(std::chrono::steady_clock::now())
 {
@@ -39,9 +38,9 @@ size_t	Client::getEffectiveMaxBodySize(void) const
 	return _request.effectiveMaxBodySize;
 }
 
-bool	Client::getIsConnected(void) const
+bool	Client::getIsMarkedForClose() const
 {
-	return _isConnected;
+	return _isMarkedForClose;
 }
 
 const std::string& Client::getWriteBuffer() const
@@ -82,9 +81,9 @@ void	Client::setEffectiveMaxBodySize(size_t size)
 	_request.effectiveMaxBodySize = size;
 }
 
-void	Client::disConnected(void)
+void	Client::setIsMarkedForClose(void)
 {
-	_isConnected = false;
+	_isMarkedForClose = false;
 }
 
 void	Client::appendReadBuffer(const char* data, size_t size)
