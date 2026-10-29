@@ -256,6 +256,8 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 
 	std::ostringstream name;
 	name << "upload_" << time(NULL) << "_" << counter++;
+	// TODO: research on how can we give a name of the uploaded file.
+	// abstract the name of the uploaded file, and add a special serials of number. 
 
 	std::string target = dir + name.str();
 	std::ofstream out(target.c_str(), std::ios::out | std::ios::binary);
