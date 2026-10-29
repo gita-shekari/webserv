@@ -3,31 +3,35 @@
 #include <fcntl.h>
 
 Server::Server(const std::vector<ServerConfig>& config)
-	: _config(config)
+	: _isRunning(false),
+	  _config(config)
 {
 	Logger::debug("server object created");
 }
 // Need server shutdown function.
-Server::~Server(void)
+Server::~Server()
 {
-	for (std::map<int, size_t>::iterator it = _listeners.begin();
-		it != _listeners.end();
-		++it)
-		close(it->first);
-
-	for (std::map<int, Client>::iterator it = _clients.begin();
-		it != _clients.end();
-		++it)
-		close(it->first);
+	shutdown();
 	// not only close socket, also need to check pullfd and clients in case of throw exception destructor.
 	Logger::info("server stopped");
 }
 
 // do we need to return as int?
-void Server::start(void)
+int	Server::start()
 {
-	setListeningSockets();
-	runningLoop();
+	try
+	{
+		setListeningSockets();
+		runningLoop();
+	}
+	catch (const std::exception& e)
+	{
+		Logger::error(e.what());
+		shutdown();
+		return 1;
+	}
+	shutdown();
+	return 0;
 }
 
 bool	Server::setNonBlocking(int fd)

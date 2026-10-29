@@ -27,9 +27,10 @@ class Server
 	public:
 		// system methods
 		Server(const std::vector<ServerConfig>& config);
-		~Server(void);
-		void		start(void);
-		void	runningLoop(void);
+		~Server();
+	
+		int		start();
+		void	runningLoop();
 		void 	handlePollCallError(int& eagainCount);
 		bool	handlePollException(int fd, short revents);
 		void	addPollFds(int fd, short events);
@@ -48,9 +49,6 @@ class Server
 		void	checkTimeouts(void);
 			// Utils for client
 		bool	isClientFd(int fd) const;
-		void	markForClose(int fd);
-		void	removeCloseClient();
-
 
 		// for listen fd
 		void	validateUniquePorts(void) const;
@@ -61,6 +59,9 @@ class Server
 		void	acceptNewClient(int listenerFd);
 		bool	receiveClientData(Client& client);
 		bool	sendClientData(Client& client);
+
+		// Resource cleanup
+		void	shutdown();
 
 		class ServerException : public std::exception
 		{
@@ -79,5 +80,16 @@ class Server
 		std::map<int, size_t>						_listeners;
 		std::map<int, Client>						_clients;
 		std::map<int, int>							_pipeFds;
+
 		Server(void);
+
+		void	closeClient(int clientFd);
+		void	closeListener(int listenerFd);
+		void	cleanupCgi(int clientFd);
+
+		void	removePollFd(int fd);
+
+		void	markForClose(int fd);
+
+		void	removeCloseClient();
 };
