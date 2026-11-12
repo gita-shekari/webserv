@@ -73,7 +73,23 @@ void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& l
 	else
 	{
 		Logger::debug("parent");
+		//_pid = pid;
+		_state = CGI_RUNNING;
+
 	}
 }
 
 
+//checkPIDprocess()
+//{
+	// result = waitpid()
+//	if (result > 0)
+//	{
+//      readRemainingCGIData(pipefd)
+//		buildCGIResponse();
+//		_state = RESPONSE_READY;
+//		close(pipeFd);
+//		find it in server._pollFd, and make it = -1
+//		remove from server._pipeFds
+//	}
+//}

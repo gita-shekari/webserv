@@ -117,7 +117,7 @@ bool	Server::receiveClientData(Client& client)
 		if (saveErr == ECONNRESET || saveErr == ETIMEDOUT)
 		{
 			markForClose(fd);
-			Logger::systemError(Logger::INFO, "recv: client connection ended", saveErr);
+			Logger::info("recv: client connection ended");
 		}
 		else if (saveErr == EINTR)
 			Logger::debug("recv interrupted; retry on the next event");
@@ -158,4 +158,21 @@ bool Server::sendClientData(Client& client)
 		markForClose(fd);
 	}
 	return false;
+}
+
+bool	Server::isClientFd(int fd) const
+{
+	return _clients.find(fd) != _clients.end();
+}
+
+Client& Server::getClient(int clientFd)
+{
+	std::map<int, Client>::iterator it = _clients.find(clientFd);
+	if (it == _clients.end())
+	{
+		Logger::fatal("event registry invariant violated: poll fd="
+			+ std::to_string(clientFd) + " has no Client");
+		throw ServerException();
+	}
+	return (it->second);
 }

@@ -241,11 +241,9 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 			if (!parseHexSize(sizeNum, _chunkSize))
 				return error(req, BAD_REQ);
 			_cursor = sizeEnd + 2;
-
 			if (req.body.size() > req.effectiveMaxBodySize
 				|| _chunkSize > req.effectiveMaxBodySize - req.body.size())
 				return error(req, PAYLOAD_TOO_LARGE);
-
 			if (_chunkSize == 0)
 			{
 				if (buffer.size() - _cursor < 2)

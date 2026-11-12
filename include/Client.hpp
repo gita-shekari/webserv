@@ -49,7 +49,7 @@ class Client
 		size_t		getServerIndex(void) const;
 		size_t		getLocationIndex(void) const;
 		size_t		getEffectiveMaxBodySize(void) const;
-		bool		getIsConnected(void) const;
+		bool		getIsMarkedForClose() const;
 		const std::string& getWriteBuffer() const;
 		// no one is using getReq()?
 		Request		getReq(void) const;
@@ -61,7 +61,7 @@ class Client
 
 		// setters
 		void		setEffectiveMaxBodySize(size_t size);
-		void		disConnected(void);
+		void		setIsMarkedForClose(void);
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
 
@@ -79,15 +79,13 @@ class Client
 		void		routingDelete(const ServerConfig& sc, std::string& fullPath);
 
 		void		handleErrorResponse(const ServerConfig& sc, HttpStatus code);
-		bool		isDirectoryEntry(const std::string& fullPath, const std::string& name);
-		bool		readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries);
-		void		handleDirectoryOpenError(const ServerConfig& serverConfig);
 		void		handleDirectoryListing(const ServerConfig& serverConfig, const std::string& fullPath);
 		void		handleCGI(const ServerConfig& serverConfig, const LocationConfig& lc, const std::string& scriptPath);
 		void		handleStatic(const ServerConfig& serverConfig, const std::string& filePath);
 		void		handleRedirect(int code, const std::string& redirURI);
 		void		handleDelete(const ServerConfig& serverConfig, const std::string& filePath);
 		void		handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc);
+		
 		void		prepareResponseForSending();
 		void		updateLastActivity(void);
 
@@ -95,7 +93,7 @@ class Client
 		int				_fd = -1;
 		size_t			_serverIndex;
 		size_t			_locationIndex = static_cast<size_t>(-1);
-		bool			_isConnected = false;
+		bool			_isMarkedForClose = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
 		ssize_t			_writeOffSet;

@@ -28,43 +28,10 @@
 class Server
 {
 	public:
-		// system methods
 		Server(const std::vector<ServerConfig>& config);
-		~Server(void);
-		int		start(void);
-		void	runningLoop(void);
-		void 	handlePollCallError(int& eagainCount);
-		bool	handlePollException(int fd, short revents);
-		void	addPollFds(int fd, short events);
-		bool	setNonBlocking(int fd);
-
-		bool	isCgiPipeFd(int fd);
-		Client& getBelongedClient(int fd);
-		void	handleEvent(pollfd& pfd, short& revents, Client& client);
-		void	handleCgiPipeEvent(pollfd& pfd, short& revents);
-
-
-		//Utils
-		bool	getRunning(void);
-		Client& getClient(int clientFd);
-		bool	isListeningFd(int fd) const;
-			// for timeout
-		void	checkTimeouts(void);
-			// Utils for client
-		bool	isClientFd(int fd) const;
-		void	markForClose(int fd);
-		void	removeCloseClient();
-
-
-		// for listen fd
-		void	validateUniquePorts(void) const;
-		void	setListeningSockets(void);
-		int		createListeningSocket(const ServerConfig& config);
-
-		// for client fd
-		void	acceptNewClient(int listenerFd);
-		bool	receiveClientData(Client& client);
-		bool	sendClientData(Client& client);
+		~Server();
+	
+		int		start();
 
 		//Server Signals
 		static void	installSignals();
@@ -74,6 +41,9 @@ class Server
 		{
 			const char* what() const noexcept override;
 		};
+
+		//todo: no use
+		bool	getRunning(void);
 
 	private:
 		static const int	CLIENT_TIMEOUT_SEC = 30;
@@ -88,9 +58,47 @@ class Server
 		std::map<int, Client>						_clients;
 		std::map<int, int>							_pipeFds;
 
+		//prevent copying
 		Server(void);
+		Server(const Server&);
+		Server& operator=(const Server&);
 
-		//Server Signals
+		//1. server lifecycle / event loop
+		void	runningLoop();
+		void 	handlePollCallError(int& eagainCount);
+		bool	handlePollException(int fd, short revents);
+		bool	setNonBlocking(int fd);
+		void	addPollFds(int fd, short events);
+		void	checkTimeouts(void);
+
+		//2. listening sockets
+		void	validateUniquePorts(void) const;
+		void	setListeningSockets(void);
+		int		createListeningSocket(const ServerConfig& config);
+		bool	isListeningFd(int fd) const;
+
+		//3. clients
+		void	acceptNewClient(int listenerFd);
+		bool	receiveClientData(Client& client);
+		bool	sendClientData(Client& client);
+		bool	isClientFd(int fd) const;
+		Client& getClient(int clientFd);
+
+		//4. event handling / CGI
+		bool	isCgiPipeFd(int fd);
+		Client& getBelongedClient(int fd);
+		void	handleEvent(pollfd& pfd, short& revents, Client& client);
+		void	handleCgiPipeEvent(pollfd& pfd, short& revents);
+
+		//5. resource cleanup
+		void	markForClose(int fd);
+		void	removeMarkedClients();
+		void	shutdown();
+		void	removePollFd(int fd);
+		void	closeClient(int clientFd);
+		void	cleanupCgi(int clientFd);
+
+		//6. Server Signals
 		static void	handleStopSignal(int signal);
 		static volatile	std::sig_atomic_t	_stopRequested;
 };
