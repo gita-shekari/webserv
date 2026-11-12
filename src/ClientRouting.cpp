@@ -1,7 +1,6 @@
 #include "Client.hpp"
 #include "RoutingUtils.hpp"
 
-
 /**
  * @brief Checks whether a requested filesystem path can be handled by the server.
  *
@@ -257,9 +256,6 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 
 	std::ostringstream name;
 	name << "upload_" << time(NULL) << "_" << counter++;
-	// TODO: research on how can we give a name of the uploaded file.
-	// abstract the name of the uploaded file, and add a special serials of number. 
-
 	std::string target = dir + name.str();
 	std::ofstream out(target.c_str(), std::ios::out | std::ios::binary);
 	if (!out.is_open())
@@ -270,9 +266,7 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 			_request.httpStatus = FORBIDDEN;
 		else
 			_request.httpStatus = INTERNAL_SERVER_ERR;
-
-		_response = _builder.buildErrorResponse(_request.httpStatus, serverConfig);
-		_state = RESPONSE_READY;
+		handleErrorResponse(serverConfig, _request.httpStatus);
 		return;
 	}
 	out.write(_request.body.c_str(), _request.body.size());
@@ -280,13 +274,23 @@ void Client::handleUpload(const ServerConfig& serverConfig, const LocationConfig
 	{
 		Logger::error("upload failed while writing: path=" + target);
 		out.close();
-		_response = _builder.buildErrorResponse(INTERNAL_SERVER_ERR, serverConfig);
-		_state = RESPONSE_READY;
+		handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
 		return;
 	}
 	out.close();
+	if (out.fail())
+	{
+		Logger::error("upload failed while closing: path=" + target);
+		unlink(target.c_str());
+		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
+	}
+
 	Logger::debug("upload successful: path=" + target + ", bytes=" + std::to_string(_request.body.size()));
-	_response = _builder.buildCreatedResponse(_request.path + name.str());
+	std::string resourceUri = lc.path;
+	if (resourceUri.empty() || resourceUri[resourceUri.size() - 1] != '/')
+		resourceUri += '/';
+	resourceUri += name.str();
+	_response = _builder.buildCreatedResponse(resourceUri);
 	_state = RESPONSE_READY;
 }
 /**
