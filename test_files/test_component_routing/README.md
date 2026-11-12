@@ -26,6 +26,8 @@ CGI execution is excluded.
   and preservation of unrelated files.
 - Uploads: POST trailing-slash redirect, successful text and binary uploads,
   missing request target, disabled upload and missing upload store.
+- Upload/download round trips: text, binary bytes (including NUL), and a missing
+  POST target; follow the returned Location using the same configuration.
 
 Read-only cases use repository fixtures. Each mutating case owns a fresh mkdtemp
 folder and prepares copies of the needed fixtures. Its destructor removes created
@@ -33,8 +35,9 @@ files and directories even if the case throws. Repository fixtures are never
 uploaded into or deleted. Empty directories are created at runtime.
 Upload filenames are discovered from the output directory rather than predicted
 from the clock or counter. Location checks require an absolute path ending with
-the created filename; URL reachability is not checked because it additionally
-requires a matching GET mapping for upload_store.
+the created filename. Dedicated round-trip cases configure /upload with root
+and upload_store pointing to the same temporary directory, then GET the returned
+Location and compare the downloaded bytes with the uploaded bytes.
 
 ## Known failures
 
@@ -51,3 +54,9 @@ expected successes. The tests expect uppercase percent-encoding hex digits.
 Error cases configure real custom error pages so fallback-to-500 behavior does
 not obscure routing status checks. General parser errors, socket I/O, connection
 cleanup, CGI and error-page fallback behavior are outside this suite's coverage.
+
+## CI
+
+The workflow runs unit tests and component tests as separate steps for g++ and
+clang++. Matrix fail-fast is disabled so a failure does not cancel the other
+compiler. Known listing failures remain ordinary failures and make CI red.

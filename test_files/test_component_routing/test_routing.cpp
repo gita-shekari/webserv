@@ -589,6 +589,54 @@ static void testUploadMissingTarget(TestRunner& tests, const std::string& source
     checkUpload(tests, source, "POST missing target", "/new-resource.txt", "new resource");
 }
 
+// GET root and POST storage share a directory, as in the real /upload config.
+// Follow Location verbatim: do not construct the URL used for the GET request.
+static void checkUploadDownload(TestRunner& tests, const std::string& source,
+    const std::string& name, const std::string& target, const std::string& body)
+{
+    TemporaryFixture fixture;
+    fixture.prepare(source);
+    ServerConfig config = uploadConfig(fixture);
+    config.locations[0].path = "/upload";
+    config.locations[0].root = fixture.root + "/uploads";
+
+    const ObservedResponse uploaded = executeRequest(config, request("POST", target, body));
+    tests.checkEqual(name + ": POST status", 201, uploaded.status);
+    const std::vector<std::string> files = directoryEntries(fixture.root + "/uploads");
+    tests.checkEqual(name + ": one saved file", static_cast<size_t>(1), files.size());
+    if (files.size() != 1)
+        return;
+    const std::string location = header(uploaded, "location");
+    tests.checkEqual(name + ": Location maps to saved file",
+        std::string("/upload/") + files[0], location);
+    if (location == "<missing>" || location.empty() || location[0] != '/')
+        return;
+
+    const ObservedResponse downloaded = executeRequest(config, getRequest(location));
+    tests.checkEqual(name + ": GET status", 200, downloaded.status);
+    tests.checkEqual(name + ": downloaded bytes equal uploaded bytes", body, downloaded.body);
+    checkLength(tests, name + " download", downloaded);
+    tests.checkEqual(name + ": saved bytes", body,
+        readFile(fixture.root + "/uploads/" + files[0]));
+}
+
+static void testUploadDownload(TestRunner& tests, const std::string& source)
+{
+    checkUploadDownload(tests, source, "upload/download text", "/upload/", "uploaded content\n");
+}
+
+static void testBinaryUploadDownload(TestRunner& tests, const std::string& source)
+{
+    checkUploadDownload(tests, source, "upload/download binary",
+        "/upload/", std::string("a\0b\r\n", 5));
+}
+
+static void testMissingTargetUploadDownload(TestRunner& tests, const std::string& source)
+{
+    checkUploadDownload(tests, source, "upload/download missing target",
+        "/upload/new-resource.txt", "new resource");
+}
+
 static void testUploadDisabled(TestRunner& tests, const std::string& source)
 {
     TemporaryFixture fixture;
@@ -659,6 +707,9 @@ int main()
         runCase(tests, "testUpload", testUpload, root);
         runCase(tests, "testBinaryUpload", testBinaryUpload, root);
         runCase(tests, "testUploadMissingTarget", testUploadMissingTarget, root);
+        runCase(tests, "testUploadDownload", testUploadDownload, root);
+        runCase(tests, "testBinaryUploadDownload", testBinaryUploadDownload, root);
+        runCase(tests, "testMissingTargetUploadDownload", testMissingTargetUploadDownload, root);
         runCase(tests, "testUploadDisabled", testUploadDisabled, root);
         runCase(tests, "testUploadMissingStore", testUploadMissingStore, root);
     }
