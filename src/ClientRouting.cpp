@@ -1,6 +1,7 @@
 #include "Client.hpp"
 #include "RoutingUtils.hpp"
 
+
 /**
  * @brief Checks whether a requested filesystem path can be handled by the server.
  *
@@ -318,7 +319,7 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 			if (RoutingUtils::isCGI(lc, indexPath))
 			{
 				Logger::debug("GET directory index detected as CGI: calling handleCGI");
-				return handleCGI(sc, lc, indexPath);
+				return ;//handleCGI(sc, lc, indexPath);
 			}
 			return handleStatic(sc, indexPath);
 		}
@@ -334,7 +335,7 @@ void Client::routingGet(const ServerConfig& sc, const LocationConfig& lc, std::s
 		if (RoutingUtils::isCGI(lc, fullPath))
 		{
 			Logger::debug("GET regular file detected as CGI: calling handleCGI");
-			return handleCGI(sc, lc, fullPath);
+			return ;//handleCGI(sc, lc, fullPath);
 		}
 		return handleStatic(sc, fullPath);
 	}
@@ -357,7 +358,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 			if (RoutingUtils::isCGI(lc, RoutingUtils::joinPath(fullPath, lc.index)))
 			{
 				Logger::debug("post, path is direc, add index is cgi. handleCGI()");
-				return handleCGI(sc, lc, RoutingUtils::joinPath(fullPath, lc.index));
+				return ;//handleCGI(sc, lc, RoutingUtils::joinPath(fullPath, lc.index));
 			}
 		}
 	}
@@ -366,7 +367,7 @@ void Client::routingPost(const ServerConfig& sc, const LocationConfig& lc, std::
 		if (RoutingUtils::isCGI(lc, fullPath))
 		{
 			std::cout << "post, is cgi. handleCGI()" << std::endl;
-			return handleCGI(sc, lc, fullPath);
+			return ;//handleCGI(sc, lc, fullPath);
 		}
 	}
 	if (lc.upload_enabled && !lc.upload_store.empty())
