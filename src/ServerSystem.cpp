@@ -3,7 +3,7 @@
 #include <fcntl.h>
 
 Server::Server(const std::vector<ServerConfig>& config)
-	: _config(config)
+	: isRunning(false), _config(config)
 {
 	Logger::debug("server object created");
 }
@@ -24,7 +24,7 @@ Server::~Server(void)
 }
 
 // do we need to return as int?
-int Server::start(void)
+int	Server::start(void)
 {
 	try
 	{
@@ -154,13 +154,16 @@ void	Server::runningLoop(void)
 {
 	int	eagainCount = 0;
 
-	while (_isRunning)
+	while (_isRunning && stopRequested())
 	{
 		const size_t polledFdCount = _pollfds.size();
 		if (polledFdCount == 0)
 			continue;
 		// because the size might change since accpet new fds push back in to _pollfds;
 		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
+
+		if (stopRequested())
+			break;
 
 		if (res == -1)
 		{
@@ -172,7 +175,7 @@ void	Server::runningLoop(void)
 
 		if (res > 0)
 		{
-			for (size_t i = 0; i < polledFdCount; i++)
+			for (size_t i = 0; i < polledFdCount && !stopRequested(); i++)
 			{
 				short revents = _pollfds[i].revents;
 				int fd = _pollfds[i].fd;
@@ -204,7 +207,7 @@ void	Server::runningLoop(void)
 				handleEvent(_pollfds[i], revents, client);
 			}
 		}
-		//
+		_isRunning = false;
 		//TODO:: checkCgiProcesses();
 		checkTimeouts();
 		// need to remove closed fds from pollFds, also check how the macro works with revents.

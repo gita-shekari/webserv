@@ -13,7 +13,7 @@ void	Server::acceptNewClient(int listenerFd)
 
 	size_t	acceptedCount = 0;
 
-	while (acceptedCount < MAX_ACCEPTS_PER_EVENT)
+	while (acceptedCount < MAX_ACCEPTS_PER_EVENT && !stopRequested())
 	{
 		int clientFd = accept(listenerFd, NULL, NULL);
 

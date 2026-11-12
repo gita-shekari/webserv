@@ -18,6 +18,9 @@
 #include <vector>
 #include <map>
 
+// for signal
+#include <csignal>
+
 #include "Client.hpp"
 #include "Config.hpp"
 #include "Logger.hpp"
@@ -63,6 +66,10 @@ class Server
 		bool	receiveClientData(Client& client);
 		bool	sendClientData(Client& client);
 
+		//Server Signals
+		static void	installSignals();
+		static bool	stopRequested();
+
 		class ServerException : public std::exception
 		{
 			const char* what() const noexcept override;
@@ -82,4 +89,8 @@ class Server
 		std::map<int, int>							_pipeFds;
 
 		Server(void);
+
+		//Server Signals
+		static void	handleStopSignal(int signal);
+		static volatile	std::sig_atomic_t	_stopRequested;
 };
