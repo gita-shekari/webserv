@@ -69,6 +69,8 @@ void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& l
 		argv[0] = const_cast<char*>(lc.cgi_path.c_str());
 		argv[1] = const_cast<char*>(scriptName.c_str());
 		argv[2] = NULL;
+
+		(void)argv;
 	}
 	else
 	{

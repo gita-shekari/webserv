@@ -18,4 +18,6 @@ jobs:
         run: |
           make clean-tests
           make test-request-parser
-          make test-body-limits
+
+      - name: Test body limit integration
+        run: make test-body-limits
