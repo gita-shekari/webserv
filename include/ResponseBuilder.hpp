@@ -21,7 +21,7 @@ class ResponseBuilder
 		Response buildListingResponse(const std::vector<std::string>& list, const std::string& requestPath);
 		std::string serialize(const Response& response);
 	private:
-		
+
 
 		// File/path helpers
 		std::string getRoot(const ServerConfig& serverConfig, const LocationConfig& location);
@@ -29,4 +29,5 @@ class ResponseBuilder
 		bool getSource(const std::string& path, std::string& content);
 		std::string getReasonPhrase(int statusCode);
 		std::string getContentType(const std::string& path);
+		
 };

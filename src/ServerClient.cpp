@@ -13,7 +13,7 @@ void	Server::acceptNewClient(int listenerFd)
 
 	size_t	acceptedCount = 0;
 
-	while (acceptedCount < MAX_ACCEPTS_PER_EVENT)
+	while (acceptedCount < MAX_ACCEPTS_PER_EVENT && !stopRequested())
 	{
 		int clientFd = accept(listenerFd, NULL, NULL);
 
@@ -57,6 +57,32 @@ void	Server::acceptNewClient(int listenerFd)
 	}
 }
 
+ParseStatus	Server::parseClientRequest(Client& client)
+{
+	// get server-level MaxBodySize as default value
+	const ServerConfig& serverConfig = _config[client.getServerIndex()];
+		
+	if (client.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
+		client.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
+
+	ParseStatus status = client.parseReadBuffer();
+
+	if (status == NEED_LOCATION)
+	{
+		client.matchLocation(serverConfig.locations);
+		size_t	locationIndex = client.getLocationIndex();
+		if (locationIndex != static_cast<size_t>(-1))
+		{
+			const LocationConfig& location = serverConfig.locations[locationIndex];
+			//update MaxBodySize to location-level
+			if (location.has_client_max_body_size)
+				client.setEffectiveMaxBodySize(location.client_max_body_size);
+		}
+		status = client.parseReadBuffer();
+	}
+	return status;
+}
+
 bool	Server::receiveClientData(Client& client)
 {
 	char buffer[1024];
@@ -72,30 +98,17 @@ bool	Server::receiveClientData(Client& client)
 
 		client.appendReadBuffer(buffer, static_cast<size_t>(bytesReceived));
 
-		const ServerConfig& serverConfig = _config[client.getServerIndex()];
+		ParseStatus status = parseClientRequest(client);
 
-		//set server-level default only once for this request
-		if (client.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
-			client.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
-
-		ParseStatus status = client.parseReadBuffer();
-
-		if (status == NEED_LOCATION)
-		{
-			client.matchLocation(serverConfig.locations);
-			size_t	locationIndex = client.getLocationIndex();
-			if (locationIndex != static_cast<size_t>(-1))
-			{
-				const LocationConfig& location = serverConfig.locations[locationIndex];
-				//update maxBodySize to location config level
-				if (location.has_client_max_body_size)
-					client.setEffectiveMaxBodySize(location.client_max_body_size);
-			}
-			status = client.parseReadBuffer();
-		}
 		if (status == INCOMPLETE)
 			return false;
-		return true;
+
+		if (status == COMPLETE || status == ERROR)
+		{
+			client.setState(REQ_READY);
+			return true;
+		}
+		return false;
 	}
 	else if (bytesReceived == 0)
 	{
@@ -111,7 +124,7 @@ bool	Server::receiveClientData(Client& client)
 		if (saveErr == ECONNRESET || saveErr == ETIMEDOUT)
 		{
 			markForClose(fd);
-			Logger::systemError(Logger::INFO, "recv: client connection ended", saveErr);
+			Logger::info("recv: client connection ended");
 		}
 		else if (saveErr == EINTR)
 			Logger::debug("recv interrupted; retry on the next event");
@@ -124,19 +137,20 @@ bool	Server::receiveClientData(Client& client)
 	}
 }
 
-bool	Server::sendClientData(Client& client)
+bool Server::sendClientData(Client& client)
 {
 	int fd = client.getFd();
 	Logger::debug("response ready to send: fd=" + std::to_string(fd));
 
-	const std::string &buffer = client.getWriteBuffer();
-	const std::string bufferToSend = buffer.data() + client.getWriteOffSet();
-	ssize_t bytesSent = send(fd, bufferToSend.c_str(), bufferToSend.size(), 0);
+	const std::string& buffer = client.getWriteBuffer();
+	ssize_t offset = client.getWriteOffSet();
+
+	ssize_t bytesSent = send(fd, buffer.data() + offset, buffer.size() - offset, 0);
 
 	if (bytesSent > 0)
 	{
-		client.updateLastActivity();	
-		client.setWriteOffSet(bytesSent);
+		client.updateLastActivity();
+		client.setWriteOffSet(offset + bytesSent);
 		if (static_cast<size_t>(client.getWriteOffSet()) == buffer.size())
 			return true;
 		return false;
@@ -144,10 +158,28 @@ bool	Server::sendClientData(Client& client)
 	if (bytesSent == -1)
 	{
 		int saveErr = errno;
+
 		if (saveErr == EAGAIN || saveErr == EWOULDBLOCK || saveErr == EINTR)
 			return false;
 		Logger::systemError(Logger::ERROR, "send failed", saveErr);
-		markForClose(client.getFd());
+		markForClose(fd);
 	}
 	return false;
+}
+
+bool	Server::isClientFd(int fd) const
+{
+	return _clients.find(fd) != _clients.end();
+}
+
+Client& Server::getClient(int clientFd)
+{
+	std::map<int, Client>::iterator it = _clients.find(clientFd);
+	if (it == _clients.end())
+	{
+		Logger::fatal("event registry invariant violated: poll fd="
+			+ std::to_string(clientFd) + " has no Client");
+		throw ServerException();
+	}
+	return (it->second);
 }

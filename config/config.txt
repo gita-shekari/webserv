@@ -4,7 +4,7 @@
 	assessing payloads, configuring infrastructure, enforcin safety thresholds across the tech stack
 	1. Categorize application requirements (what is the data type? JSON, media sub, large file like raw datasets, pdf, video 100-500 mb)
 	2. Guard Against Resource Exhaustion (DoS)
-		Denial of Service -> playload is too big it will crash the app 
+		Denial of Service -> payload is too big it will crash the app 
 		Buffer overflow --> oversize packets in danger parsing library
 		Noisy neighbor --> slow down other users
 	3. Apply Muilti-layered enforcement (from outside edge to inwards)
