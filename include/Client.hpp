@@ -102,6 +102,6 @@ class Client
 		RequestParser	_parser;
 		Response		_response;
 		ResponseBuilder	_builder;
-		ClientState		_state;
+		ClientState		_state = READ_REQ;
 		std::chrono::steady_clock::time_point	_lastActivity;
 };

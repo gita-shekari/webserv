@@ -28,7 +28,8 @@ enum	BodyType
 enum	ChunkState
 {
 	CHUNK_SIZE,
-	CHUNK_DATA
+	CHUNK_DATA,
+	CHUNK_END
 };
 
 class RequestParser

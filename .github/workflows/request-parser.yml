@@ -1,0 +1,18 @@
+name: Request Parser Tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  request-parser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Get repository code
+        uses: actions/checkout@v4
+
+      - name: Compile and test RequestParser
+        run: make test-request-parser
