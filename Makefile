@@ -14,6 +14,10 @@ UNIT_ROUTING_UTIL_BIN := $(TEST_BIN_DIR)/test_routing_utils
 UNIT_URI_UTIL_BIN := $(TEST_BIN_DIR)/test_uri_utils
 UNIT_REQUEST_PARSER_BIN := $(TEST_BIN_DIR)/test_request_parser
 
+COMPONENT_BODY_LIMITS_BIN := $(TEST_BIN_DIR)/test_body_limits
+
+BODY_LIMITS_SRC := $(filter-out src/main.cpp,$(SRC))
+
 ### add more unit test bins in here
 UNIT_TEST_BINS := \
 	$(UNIT_ROUTING_UTIL_BIN) \
@@ -53,15 +57,24 @@ $(UNIT_REQUEST_PARSER_BIN): \
 	mkdir -p $(TEST_BIN_DIR)
 	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_request_parser.cpp src/RequestParser.cpp src/UriUtils.cpp src/Http.cpp -o $@
 
+$(COMPONENT_BODY_LIMITS_BIN): $(TEST_DIR)/test_body_limits.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		$(BODY_LIMITS_SRC) \
+		$(wildcard include/*.hpp)
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_body_limits.cpp $(BODY_LIMITS_SRC) -o $@
+
 test-routing-utils: $(UNIT_ROUTING_UTIL_BIN)
 	./$(UNIT_ROUTING_UTIL_BIN)
-
 
 test-uri-utils: $(UNIT_URI_UTIL_BIN)
 	./$(UNIT_URI_UTIL_BIN)
 
 test-request-parser: $(UNIT_REQUEST_PARSER_BIN)
 	./$(UNIT_REQUEST_PARSER_BIN)
+
+test-body-limits: $(COMPONENT_BODY_LIMITS_BIN)
+	./$(COMPONENT_BODY_LIMITS_BIN) $(TEST_DIR)/fixtures/body_limits.conf
 
 ######## ADD UNIT TESTS #############
 test-unit: test-routing-utils test-uri-utils test-request-parser
@@ -80,4 +93,4 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re test test-unit test-routing-utils test-uri-utils test-request-parser clean-tests
+.PHONY: all clean fclean re test test-unit test-routing-utils test-uri-utils test-request-parser clean-tests test-body-limits

@@ -33,6 +33,9 @@ class Server
 	
 		int		start();
 
+		//parse client request (is public for tests)
+		ParseStatus	parseClientRequest(Client& client);
+
 		//Server Signals
 		static void	installSignals();
 		static bool	stopRequested();

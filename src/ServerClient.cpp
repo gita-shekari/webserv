@@ -57,6 +57,32 @@ void	Server::acceptNewClient(int listenerFd)
 	}
 }
 
+ParseStatus	Server::parseClientRequest(Client& client)
+{
+	// get server-level MaxBodySize as default value
+	const ServerConfig& serverConfig = _config[client.getServerIndex()];
+		
+	if (client.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
+		client.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
+
+	ParseStatus status = client.parseReadBuffer();
+
+	if (status == NEED_LOCATION)
+	{
+		client.matchLocation(serverConfig.locations);
+		size_t	locationIndex = client.getLocationIndex();
+		if (locationIndex != static_cast<size_t>(-1))
+		{
+			const LocationConfig& location = serverConfig.locations[locationIndex];
+			//update MaxBodySize to location-level
+			if (location.has_client_max_body_size)
+				client.setEffectiveMaxBodySize(location.client_max_body_size);
+		}
+		status = client.parseReadBuffer();
+	}
+	return status;
+}
+
 bool	Server::receiveClientData(Client& client)
 {
 	char buffer[1024];
@@ -72,27 +98,8 @@ bool	Server::receiveClientData(Client& client)
 
 		client.appendReadBuffer(buffer, static_cast<size_t>(bytesReceived));
 
-		const ServerConfig& serverConfig = _config[client.getServerIndex()];
+		ParseStatus status = parseClientRequest(client);
 
-		//set server-level default only once for this request
-		if (client.getEffectiveMaxBodySize() == static_cast<size_t>(-1))
-			client.setEffectiveMaxBodySize(serverConfig.client_max_body_size);
-
-		ParseStatus status = client.parseReadBuffer();
-
-		if (status == NEED_LOCATION)
-		{
-			client.matchLocation(serverConfig.locations);
-			size_t	locationIndex = client.getLocationIndex();
-			if (locationIndex != static_cast<size_t>(-1))
-			{
-				const LocationConfig& location = serverConfig.locations[locationIndex];
-				//update maxBodySize to location config level
-				if (location.has_client_max_body_size)
-					client.setEffectiveMaxBodySize(location.client_max_body_size);
-			}
-			status = client.parseReadBuffer();
-		}
 		if (status == INCOMPLETE)
 			return false;
 

@@ -18,3 +18,4 @@ jobs:
         run: |
           make clean-tests
           make test-request-parser
+          make test-body-limits
