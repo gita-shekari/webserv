@@ -7,12 +7,14 @@ permissions:
 
 jobs:
   request-parser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
       - name: Get repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Compile and test RequestParser
-        run: make test-request-parser
+        run: |
+          make clean-tests
+          make test-request-parser
