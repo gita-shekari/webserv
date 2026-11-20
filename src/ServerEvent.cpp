@@ -25,11 +25,8 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 {
 	if (revents & POLLIN)
 	{
-		if (client.getState() == READ_REQ)
-		{
-			if (!receiveClientData(client))
-				return ; // continue the loop
-		}
+		if (!receiveClientData(client))
+			return ; // continue the loop
 		if (client.getState() == REQ_READY)
 		{
 			client.routing(_config[client.getServerIndex()]);
@@ -39,14 +36,11 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 			//	_pollfds.push_back(client.getPipefd());
 			//}
 		}
-		// routing to handlers (ErrorResponse, CGI, Directory list, upload or delete, redirect, static file ext.)
-		//CGI processing
 	}
 	if (client.getState() == RESPONSE_READY)
 	{
 		client.prepareResponseForSending();
 		pfd.events |= POLLOUT;
-
 	}
 	if (revents & POLLOUT)
 	{
@@ -57,7 +51,6 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 
 			// Only disable POLLOUT when the entire response
 			// has been sent.
-			//TODO: to create
 			pfd.events &= ~POLLOUT;
 		}
 		// TODO:: clean up request, parser, and reponse and everything. also check conneciton.

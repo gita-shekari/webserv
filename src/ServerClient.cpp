@@ -82,7 +82,7 @@ ParseStatus	Server::parseClientRequest(Client& client)
 	}
 	return status;
 }
-
+/** return false will back the for() to check next fd and wait for next round of recv() */
 bool	Server::receiveClientData(Client& client)
 {
 	char buffer[1024];
@@ -101,7 +101,7 @@ bool	Server::receiveClientData(Client& client)
 		ParseStatus status = parseClientRequest(client);
 
 		if (status == INCOMPLETE)
-			return false;
+			return false; 
 
 		if (status == COMPLETE || status == ERROR)
 		{
@@ -113,6 +113,13 @@ bool	Server::receiveClientData(Client& client)
 	else if (bytesReceived == 0)
 	{
 		Logger::debug("client closed connection: fd=" + std::to_string(fd));
+		/*
+		if (client.getCGIpid() > 0)
+		{
+			stopCgi();
+			// kill(); waitpid(); client.cgi_pid = -1
+		}
+		*/
 		markForClose(fd);
 		return false;
 	}

@@ -88,7 +88,7 @@ void	Server::closeClient(int clientFd)
 		return ;
 
 	std::cout << "closeClient() called: fd=" << clientFd << std::endl;
-	
+
 	cleanupCgi(clientFd);
 	removePollFd(clientFd);
 	close(clientFd);
