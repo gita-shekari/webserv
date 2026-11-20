@@ -146,6 +146,8 @@ int main(int argc, char **argv)
 		file = "config/default.conf";
 	try
 	{
+		Server::installSignals();
+
 		ConfigParser parser;
 		// parseConfig need to adapt error_page
 		std::vector<ServerConfig> configs = parser.parseConfig(file);

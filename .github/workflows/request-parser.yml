@@ -1,0 +1,23 @@
+name: Request Parser Tests
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  request-parser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Get repository code
+        uses: actions/checkout@v6
+
+      - name: Compile and test RequestParser
+        run: |
+          make clean-tests
+          make test-request-parser
+
+      - name: Test body limit integration
+        run: make test-body-limits

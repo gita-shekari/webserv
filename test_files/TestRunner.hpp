@@ -7,7 +7,7 @@ class TestRunner
 {
 public:
     TestRunner()
-        : _passed(0), _failed(0)
+        : _passed(0), _failed(0), _printPass(true)
     {
     }
 
@@ -19,7 +19,8 @@ public:
         if (condition)
         {
             ++_passed;
-            std::cout << "[PASS] " << name << '\n';
+            if (_printPass)
+                std::cout << "[PASS] " << name << '\n';
         }
         else
         {
@@ -38,7 +39,8 @@ public:
         if (expected == actual)
         {
             ++_passed;
-            std::cout << "[PASS] " << name << '\n';
+            if (_printPass)
+                std::cout << "[PASS] " << name << '\n';
         }
         else
         {
@@ -50,6 +52,10 @@ public:
                 << '\n';
         }
     }
+
+    void setPrintPass(bool enabled) { _printPass = enabled; }
+
+    int failedCount() const { return _failed; }
 
     int finish() const
     {
@@ -63,4 +69,5 @@ public:
 private:
     int _passed;
     int _failed;
+    bool _printPass;
 };

@@ -245,17 +245,11 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				|| _chunkSize > req.effectiveMaxBodySize - req.body.size())
 				return error(req, PAYLOAD_TOO_LARGE);
 			if (_chunkSize == 0)
-			{
-				if (buffer.size() - _cursor < 2)
-					return INCOMPLETE;
-				if (buffer[_cursor] != '\r' || buffer[_cursor + 1] != '\n')
-					return error(req, BAD_REQ);
-				_cursor += 2;
-				_section = DONE;
-				return COMPLETE;
-			}
-			_chunkState = CHUNK_DATA;
+				_chunkState = CHUNK_END;
+			else
+				_chunkState = CHUNK_DATA;
 		}
+
 		if (_chunkState == CHUNK_DATA)
 		{
 			size_t	bodyLength = buffer.size() - _cursor;
@@ -263,10 +257,20 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				return INCOMPLETE;
 			if (buffer[_cursor + _chunkSize] != '\r' || buffer[_cursor + _chunkSize + 1] != '\n')
 				return error(req, BAD_REQ);
-
 			req.body.append(buffer, _cursor, _chunkSize);
 			_cursor += _chunkSize + 2;
 			_chunkState = CHUNK_SIZE;
+		}
+
+		if (_chunkState == CHUNK_END)
+		{
+				if (buffer.size() - _cursor < 2)
+					return INCOMPLETE;
+				if (buffer[_cursor] != '\r' || buffer[_cursor + 1] != '\n')
+					return error(req, BAD_REQ);
+				_cursor += 2;
+				_section = DONE;
+				return COMPLETE;
 		}
 	}
 }

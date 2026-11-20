@@ -49,7 +49,7 @@ class Client
 		size_t		getServerIndex(void) const;
 		size_t		getLocationIndex(void) const;
 		size_t		getEffectiveMaxBodySize(void) const;
-		bool		getIsConnected(void) const;
+		bool		getIsMarkedForClose() const;
 		const std::string& getWriteBuffer() const;
 		// no one is using getReq()?
 		Request		getReq(void) const;
@@ -61,7 +61,7 @@ class Client
 
 		// setters
 		void		setEffectiveMaxBodySize(size_t size);
-		void		disConnected(void);
+		void		setIsMarkedForClose(void);
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
 
@@ -93,7 +93,7 @@ class Client
 		int				_fd = -1;
 		size_t			_serverIndex;
 		size_t			_locationIndex = static_cast<size_t>(-1);
-		bool			_isConnected = false;
+		bool			_isMarkedForClose = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
 		ssize_t			_writeOffSet;
