@@ -25,9 +25,16 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 {
 	if (revents & POLLIN)
 	{
-		if (!receiveClientData(client))
-			return ; // continue the loop
-		if (client.getState() == REQ_READY)
+		bool ready = receiveClientData(client);
+
+		if (client.getPeerReadClosed())
+			pfd.events &= ~POLLIN; // means during waiting for processing finished request and client close its sending to Server. Then we deregister POLLIN and no longer listening to this return event. 
+		if (client.getIsMarkedForClose())
+			return ;
+		if (!ready && !client.getPeerReadClosed())
+			return ;
+				 
+		if (ready && client.getState() == REQ_READY)
 		{
 			client.routing(_config[client.getServerIndex()]);
 			//if (client.getState() == CGI_RUNNING)
@@ -44,17 +51,29 @@ void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
 	}
 	if (revents & POLLOUT)
 	{
-		if (client.getState() == SENDING_RESPONSE)
+		if (client.getState() != SENDING_RESPONSE)
 		{
-			if (!sendClientData(client))
-				return ; // continue the loop
-
-			// Only disable POLLOUT when the entire response
-			// has been sent.
 			pfd.events &= ~POLLOUT;
+			Logger::error("POLLOUT received without a response to send");
+        	return ;
 		}
-		// TODO:: clean up request, parser, and reponse and everything. also check conneciton.
-		// if request.headers contains "connection" and "close", mark fd close
+
+		if (!sendClientData(client))
+			return ; // continue the loop
+
+		pfd.events &= ~POLLOUT;
+
+		if (client.getPeerReadClosed())
+		{
+			markForClose(client.getFd());
+			return ;
+		}
+
+		if (!client.resetClient())
+		{
+			markForClose(client.getFd());
+			return ; 
+		}
 	}
 }
 

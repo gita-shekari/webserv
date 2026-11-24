@@ -86,6 +86,16 @@ void	Client::setIsMarkedForClose(void)
 	_isMarkedForClose = true;
 }
 
+bool Client::getPeerReadClosed() const
+{
+    return _peerReadClosed;
+}
+
+void Client::setPeerReadClosed()
+{
+    _peerReadClosed = true;
+}
+
 void	Client::appendReadBuffer(const char* data, size_t size)
 {
 	_readBuffer.append(data, size);
@@ -168,4 +178,27 @@ void Client::prepareResponseForSending()
 void	Client::updateLastActivity(void)
 {
 	_lastActivity = std::chrono::steady_clock::now();
+}
+
+
+bool	Client::resetClient()
+{
+	std::map<std::string, std::string>::const_iterator it = _request.headers.find("connection");
+	if (it != _request.headers.end())
+	{
+		const std::string& value = it->second;
+		//if (needToClose(value))
+		//	return false;
+	}
+
+	_readBuffer.clear();
+	_writeBuffer.clear();
+	_writeOffSet = 0;
+	_locationIndex = static_cast<size_t>(-1);
+	_request.clear();
+	_parser.reset();
+	// no? _builder.clear()
+	_state = READ_REQ;
+	// _lastActivity ??  
+	return true;
 }

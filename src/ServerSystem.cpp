@@ -52,7 +52,7 @@ void	Server::runningLoop(void)
 		}
 
 		eagainCount = 0;
-
+		// TODO: Delete at clean up code at the end: this if res > 0 is not necessory
 		if (res > 0)
 		{
 			for (size_t i = 0; i < polledFdCount && !stopRequested(); i++)

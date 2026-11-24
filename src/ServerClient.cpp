@@ -100,27 +100,26 @@ bool	Server::receiveClientData(Client& client)
 
 		ParseStatus status = parseClientRequest(client);
 
-		if (status == INCOMPLETE)
-			return false; 
-
 		if (status == COMPLETE || status == ERROR)
 		{
 			client.setState(REQ_READY);
-			return true;
+			return true; // REQ_READY
 		}
-		return false;
+		else
+			return false; // ParseStatus == INCOMPLETE and ClientState == READ_REQ
 	}
 	else if (bytesReceived == 0)
 	{
-		Logger::debug("client closed connection: fd=" + std::to_string(fd));
-		/*
-		if (client.getCGIpid() > 0)
+		if (client.getState() == READ_REQ)
 		{
-			stopCgi();
-			// kill(); waitpid(); client.cgi_pid = -1
+			markForClose(fd); 
+			Logger::debug("recv: client shutdown its sending end without finishing sending the full request. client will be close after the event. fd=" + std::to_string(fd));
 		}
-		*/
-		markForClose(fd);
+		else
+		{
+			Logger::debug("recv: client shutdown its sending end. fd=" + std::to_string(fd));
+			//reading is end, cancle POLLIN to avoid receiving EOF again will keep dealing with sending response (or cgi).
+		}
 		return false;
 	}
 	else
@@ -165,7 +164,6 @@ bool Server::sendClientData(Client& client)
 	if (bytesSent == -1)
 	{
 		int saveErr = errno;
-
 		if (saveErr == EAGAIN || saveErr == EWOULDBLOCK || saveErr == EINTR)
 			return false;
 		Logger::systemError(Logger::ERROR, "send failed", saveErr);

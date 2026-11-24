@@ -57,6 +57,7 @@ class Client
 		ssize_t		getWriteOffSet() const;
 		bool 		getResponseisReady() const;
 		ClientState getState() const;
+		bool		getPeerReadClosed() const;
 
 
 		// setters
@@ -64,6 +65,7 @@ class Client
 		void		setIsMarkedForClose(void);
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
+		void		setPeerReadClosed();
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -89,6 +91,8 @@ class Client
 		void		prepareResponseForSending();
 		void		updateLastActivity(void);
 
+		bool		resetClient();
+
 	private:
 		int				_fd = -1;
 		size_t			_serverIndex;
@@ -97,6 +101,7 @@ class Client
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
 		ssize_t			_writeOffSet;
+		bool			_peerReadClosed = false;
 
 		Request			_request; //current request
 		RequestParser	_parser;
