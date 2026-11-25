@@ -10,6 +10,7 @@ void Request::clear()
 	version.clear();
 	headers.clear();
 	body.clear();
+	effectiveMaxBodySize = static_cast<size_t>(-1);
 	httpStatus = REQ_OK;
 }
 

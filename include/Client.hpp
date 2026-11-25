@@ -66,6 +66,7 @@ class Client
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
 		void		setPeerReadClosed();
+		void		setCloseAfterResponse();
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -102,6 +103,7 @@ class Client
 		std::string		_writeBuffer;
 		ssize_t			_writeOffSet;
 		bool			_peerReadClosed = false;
+		bool			_closeAfterResponse = false;
 
 		Request			_request; //current request
 		RequestParser	_parser;

@@ -82,8 +82,11 @@ ParseStatus	Server::parseClientRequest(Client& client)
 	}
 	return status;
 }
-/** return false will back the for() to check next fd and wait for next round of recv() */
-bool	Server::receiveClientData(Client& client)
+/** 1. Recv > 0: receive data and append to _readBuffer
+ *  2. Recv = 0: at READ_REQ state mark to close fd; at other state: client close its sending end to the server, mark peerReadClose. 
+ *  3. Recv < 0: ECONNENTRESET | ETIMEDOUT | other deadful error mark to close fd; EAGAIN | EWOULDBLOCK | EINTER will be logged and move on to next step. 
+ */
+void	Server::receiveClientData(Client& client)
 {
 	char buffer[1024];
 
@@ -97,36 +100,19 @@ bool	Server::receiveClientData(Client& client)
 			+ " bytes=" + std::to_string(bytesReceived));
 
 		client.appendReadBuffer(buffer, static_cast<size_t>(bytesReceived));
-
-		ParseStatus status = parseClientRequest(client);
-
-		if (status == COMPLETE || status == ERROR)
-		{
-			client.setState(REQ_READY);
-			return true; // REQ_READY
-		}
-		else
-			return false; // ParseStatus == INCOMPLETE and ClientState == READ_REQ
+		return ;
 	}
 	else if (bytesReceived == 0)
 	{
-		if (client.getState() == READ_REQ)
-		{
-			markForClose(fd); 
-			Logger::debug("recv: client shutdown its sending end without finishing sending the full request. client will be close after the event. fd=" + std::to_string(fd));
-		}
-		else
-		{
-			Logger::debug("recv: client shutdown its sending end. fd=" + std::to_string(fd));
-			//reading is end, cancle POLLIN to avoid receiving EOF again will keep dealing with sending response (or cgi).
-		}
-		return false;
+		Logger::debug("recv: client shutdown its sending end. fd=" + std::to_string(fd));
+		client.setPeerReadClosed();
+		return ;
 	}
 	else
 	{
 		const int saveErr = errno;
 		if (saveErr == EAGAIN || saveErr == EWOULDBLOCK)
-			return false;
+			return ;
 		if (saveErr == ECONNRESET || saveErr == ETIMEDOUT)
 		{
 			markForClose(fd);
@@ -139,7 +125,7 @@ bool	Server::receiveClientData(Client& client)
 			Logger::systemError(Logger::ERROR, "recv failed", saveErr);
 			markForClose(fd);
 		}
-		return false;
+		return ;
 	}
 }
 

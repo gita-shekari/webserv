@@ -413,10 +413,10 @@ void Client::routingDelete(const ServerConfig& sc, std::string& fullPath)
 
 void Client::routing(const ServerConfig& serverConfig)
 {
-	const LocationConfig lc = serverConfig.locations[_locationIndex];
 	if (_request.httpStatus != REQ_OK)
 		return handleErrorResponse(serverConfig, _request.httpStatus);
 
+	const LocationConfig lc = serverConfig.locations[_locationIndex];
 	if (lc.has_redirect)
 		return handleRedirect(lc.redirect_code, lc.redirect_target);
 

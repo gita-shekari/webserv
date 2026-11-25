@@ -82,7 +82,7 @@ class Server
 
 		//3. clients
 		void	acceptNewClient(int listenerFd);
-		bool	receiveClientData(Client& client);
+		void	receiveClientData(Client& client);
 		bool	sendClientData(Client& client);
 		bool	isClientFd(int fd) const;
 		Client& getClient(int clientFd);
