@@ -3,6 +3,7 @@
 # include "Http.hpp"
 # include "RequestParser.hpp"
 # include "ResponseBuilder.hpp"
+# include "Utils.hpp"
 #include <sys/stat.h>
 #include <dirent.h>
 # include <string>

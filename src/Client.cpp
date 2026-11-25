@@ -107,10 +107,7 @@ void	Client::appendReadBuffer(const char* data, size_t size)
 }
 ParseStatus	Client::parseReadBuffer(void)
 {
-	ParseStatus status = _parser.parseRequest(_readBuffer, _request);
-	//if (status == COMPLETE)
-	//	_readBuffer.clear();
-	return status;
+	return _parser.parseRequest(_readBuffer, _request);
 }
 
 void	Client::matchLocation(const std::vector<LocationConfig>& locations)
@@ -146,64 +143,12 @@ void Client::prepareResponseForSending()
 	_writeOffSet = 0;
 	_state = SENDING_RESPONSE;
 }
-//enum	ConfigBehavior
-//{
-//	REDIRECT,
-//	CGI,
-//	UPLOAD,
-//	DELETE,
-//	DIRECTORU_LISTING,
-//	STATIC
-//};
-
-// ConfigBehavior checkConfigBehavior(const ServerConfig& sc, const LocationConfig& lc, const Request& req)
-// {
-// 	std::string root = sc.root;
-// 	if (lc.root.size() != 0)
-// 		root = lc.root;
-// 	root + lc.path;
-// 	if (lc.cgiHandlers.size() != 0)
-// }
-
-// void Client::routing(const ServerConfig& serverConfig)
-// {
-// 	if(_request.httpStatus != REQ_OK)
-// 	{
-// 		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-// 	}
-// 	else
-// 	{
-// 		ConfigBehavior action = checkConfigBehavior(serverConfig, serverConfig.locations[_locationIndex], _request);
-// 	}
-// 	//else
-// 	//	_response = _builder.buildResponse(_request, serverConfig);
-// 	//_writeBuffer = _builder.serialize(_response);
-// }
 
 void	Client::updateLastActivity(void)
 {
 	_lastActivity = std::chrono::steady_clock::now();
 }
 
-std::string	toLower(const std::string& str)
-{
-	std::string	ret = str;
-	for (size_t i = 0; i < ret.size(); ++i)
-		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
-	return ret;
-}
-
-std::string	trim(const std::string& str)
-{
-	size_t	start = 0;
-	size_t	end = str.size();
-
-	while (start < end && (str[start] == ' ' || str[start] == '\t'))
-		++start;
-	while (end >start && (str[end - 1] == ' ' || str[end - 1] == '\t'))
-		--end;
-	return str.substr(start, end - start);
-}
 bool needToClose(const std::string& value)
 {
 	size_t comma = 0;
@@ -215,7 +160,7 @@ bool needToClose(const std::string& value)
 		if (comma == std::string::npos)
 			comma = value.size();
 
-		token = toLower(trim(value.substr(start, comma - start)));
+		token = Utils::toLower(Utils::trim(value.substr(start, comma - start)));
 		if (token == "close")
 			return true;
 		start = comma + 1;

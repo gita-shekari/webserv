@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Config.hpp"
+#include "Utils.hpp"
 
 #include <string>
 #include <vector>
