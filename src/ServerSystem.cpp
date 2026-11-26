@@ -55,7 +55,6 @@ void	Server::runningLoop(void)
 		// TODO: Delete at clean up code at the end: this if res > 0 is not necessory
 		if (res > 0)
 		{
-			bool finishedPipe = false;
 			for (size_t i = 0; i < polledFdCount && !stopRequested(); i++)
 			{
 				short revents = _pollfds[i].revents;
@@ -81,12 +80,9 @@ void	Server::runningLoop(void)
 				if (isCgiPipeFd(fd))
 				{
 					handleCgiPipeEvent(_pollfds[i], revents);
-					finishedPipe |= _pollfds[i].fd == -1;
 					continue;
 				}				
 			}
-			if (finishedPipe)
-				removePollFd(-1);
 		}
 		//TODO:: checkCgiProcesses();
 		checkTimeouts();
