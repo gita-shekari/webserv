@@ -1,24 +1,39 @@
 #include "Server.hpp"
 // for non blocking
 #include <fcntl.h>
+#include <csignal>
+#include <sys/wait.h>
+#include <algorithm>
 
 Server::Server(const std::vector<ServerConfig>& config)
 	: _config(config)
 {
+	// A CGI may close stdin early. Treat a failed pipe write as EPIPE, not server termination.
+	signal(SIGPIPE, SIG_IGN);
 	Logger::debug("server object created");
 }
 // Need server shutdown function.
 Server::~Server(void)
 {
 	for (std::map<int, size_t>::iterator it = _listeners.begin();
-		it != _listeners.end();
+		it != _listeners.end(); 
 		++it)
 		close(it->first);
 
 	for (std::map<int, Client>::iterator it = _clients.begin();
 		it != _clients.end();
 		++it)
+	{
+		// Shutdown owns every remaining CGI pipe and child, just like client disconnect cleanup.
+		cleanupCGI(it->second);
 		close(it->first);
+	}
+	for (size_t i = 0; i < _cgiToReap.size(); ++i)
+	{
+		// At shutdown there is no event loop left; the killed children must be reaped here.
+		while (waitpid(_cgiToReap[i], NULL, 0) == -1 && errno == EINTR)
+		{}
+	}
 	// not only close socket, also need to check pullfd and clients in case of throw exception destructor.
 	Logger::info("server stopped");
 }
@@ -161,12 +176,11 @@ void	Server::runningLoop(void)
 			continue;
 		// because the size might change since accpet new fds push back in to _pollfds;
 		int res = poll(&_pollfds[0], polledFdCount, POLL_TIMEOUT_MS);
-		//for testing CGI
-		// if (res == -1)
-		// {
-		// 	handlePollCallError(eagainCount);
-		// 	continue;
-		// }
+		if (res == -1)
+		{
+			handlePollCallError(eagainCount);
+			continue;
+		}
 
 		eagainCount = 0;
 
@@ -177,8 +191,15 @@ void	Server::runningLoop(void)
 				short revents = _pollfds[i].revents;
 				int fd = _pollfds[i].fd;
 
-				if (revents == 0)
+				if (fd == -1 || revents == 0)
 					continue;
+
+				// Pipe HUP means output may still need draining; it is not a client socket error.
+				if (isCgiPipeFd(fd))
+				{
+					handleCgiPipeEvent(_pollfds[i], revents);
+					continue;
+				}
 
 				if (handlePollException(fd, revents))
 					continue;
@@ -190,13 +211,6 @@ void	Server::runningLoop(void)
 					continue;
 				}
 
-				// TODO: to be created
-				if (isCgiPipeFd(fd))
-				{
-					handleCgiPipeEvent(_pollfds[i], revents);
-					continue;
-				}
-
 				if (!isClientFd(fd))
 					continue;
 
@@ -204,10 +218,13 @@ void	Server::runningLoop(void)
 				handleEvent(_pollfds[i], revents, client);
 			}
 		}
-		//
-		//TODO:: checkCgiProcesses();
+		// Check child exits and execution deadlines even when poll returned no ready events.
+		checkCgiProcesses();
 		checkTimeouts();
 		// need to remove closed fds from pollFds, also check how the macro works with revents.
 		removeCloseClient();
+		// Dispatch is finished, so removing retired pipe slots can no longer skip an event.
+		_pollfds.erase(std::remove_if(_pollfds.begin(), _pollfds.end(),
+			[](const pollfd& pfd) { return pfd.fd == -1; }), _pollfds.end());
 	}
 }

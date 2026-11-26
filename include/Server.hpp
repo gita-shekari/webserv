@@ -36,8 +36,12 @@ class Server
 		bool	setNonBlocking(int fd);
 
 		void	registerCgiPipes(Client& client);
-		// void	removeCgiPipe(int fd);
-		// void	checkCgiProcesses(); /// next to do
+		// Defer pipe removal so dispatch never invalidates poll vector indices.
+		void	removeCgiPipe(int fd);
+		void	cleanupCGI(Client& client);
+		void	failCGI(Client& client, HttpStatus status);
+		void	checkCgiProcesses();
+		void	prepareClientResponse(Client& client);
 		bool	isCgiPipeFd(int fd);
 		Client& getBelongedClient(int fd);
 		void	handleEvent(pollfd& pfd, short& revents, Client& client);
@@ -73,6 +77,7 @@ class Server
 
 	private:
 		static const int	CLIENT_TIMEOUT_SEC = 30;
+		static const int	CGI_TIMEOUT_SEC = 5; // Absolute deadline, even if output keeps arriving.
 		static const int	POLL_TIMEOUT_MS = 1000;
 		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
 
@@ -83,6 +88,9 @@ class Server
 		std::map<int, size_t>						_listeners;
 		std::map<int, Client>						_clients;
 		std::map<int, int>							_pipeFds;
+
+		// Reap killed children without blocking the event loop.
+		std::vector<pid_t> _cgiToReap;
 
 		Server(void);
 };

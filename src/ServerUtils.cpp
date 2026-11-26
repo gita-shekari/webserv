@@ -46,6 +46,8 @@ void	Server::removeCloseClient(void)
 	{
 		if (!it->second.getIsConnected())
 		{
+			// A disconnected browser must not leave its Python process or registered pipes behind.
+			cleanupCGI(it->second);
 			int closeFd = it->second.getFd();
 			std::vector<struct pollfd>::iterator pfdIt = _pollfds.begin();
 			while (pfdIt != _pollfds.end())

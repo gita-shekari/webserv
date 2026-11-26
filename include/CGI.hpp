@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <chrono>
 #include <sys/types.h>
 #include "Http.hpp"
 #include "Config.hpp"
@@ -18,6 +19,11 @@ class CGI
 		size_t	getBodyOffset() const;
 		const std::string& getOutput() const;
 
+		// Execution time and exit status are separate from client socket activity.
+		std::chrono::steady_clock::time_point getStartedAt() const;
+		int		getExitStatus() const;
+		void	setExitStatus(int status);
+
 		void	setPid(pid_t pid);
 		void	setInputFd(int fd);
 		void	setOutputFd(int fd);
@@ -34,4 +40,6 @@ class CGI
 		int			_outputFd;
 		size_t		_bodyOffset;
 		std::string	_output;
+		std::chrono::steady_clock::time_point _startedAt;
+		int			_exitStatus = -1;
 };

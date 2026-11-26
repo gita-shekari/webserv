@@ -62,6 +62,11 @@ class Client
 		CGI&				getCGI();
 		const CGI&			getCGI() const;
 
+		// Avoid copying a large POST body on each writable pipe event.
+		const std::string& getRequestBody() const;
+		// Convert CGI headers and body into an HTTP response.
+		void finishCGI(const ServerConfig& serverConfig);
+
 		// setters
 		void		setEffectiveMaxBodySize(size_t size);
 		void		disConnected(void);
@@ -109,6 +114,6 @@ class Client
 		RequestParser	_parser;
 		Response		_response;
 		ResponseBuilder	_builder;
-		ClientState		_state;
+		ClientState		_state = READ_REQ; // New connections start by parsing a request.
 		std::chrono::steady_clock::time_point	_lastActivity;
 };
