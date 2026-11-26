@@ -1,26 +1,34 @@
-NAME = webserv
+NAME := webserv
 
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++11
+INCLUDE = -Iinclude
 
 SRC := $(shell find src -type f -name '*.cpp')
 OBJ := $(SRC:.cpp=.o)
-#SRC = \
-#	src/Client.cpp \
-#	src/ConfigParser.cpp \
-#	test_files/test_match_location.cpp \
-#	src/RequestParser.cpp \
-#	src/UriUtils.cpp
-## 	src/Http.cpp \
-## 	src/Logger.cpp \
-## 	src/ResponseBuilder.cpp \
-## 	src/Server.cpp \
-## 	src/main.cpp
 
-#OBJ = $(SRC:.cpp=.o)
+TEST_DIR := test_files
+TEST_BIN_DIR := tests/bin
 
-INCLUDE = -Iinclude
+UNIT_ROUTING_UTIL_BIN := $(TEST_BIN_DIR)/test_routing_utils
+UNIT_URI_UTIL_BIN := $(TEST_BIN_DIR)/test_uri_utils
+UNIT_REQUEST_PARSER_BIN := $(TEST_BIN_DIR)/test_request_parser
 
+COMPO_ROUTING_BIN := $(TEST_BIN_DIR)/test_component_routing
+COMPONENT_BODY_LIMITS_BIN := $(TEST_BIN_DIR)/test_body_limits
+
+BODY_LIMITS_SRC := $(filter-out src/main.cpp,$(SRC))
+
+### add more unit test bins in here
+UNIT_TEST_BINS := \
+	$(UNIT_ROUTING_UTIL_BIN) \
+	$(UNIT_URI_UTIL_BIN) \
+	$(UNIT_REQUEST_PARSER_BIN)
+
+COMPO_TEST_BIN := \
+	$(COMPO_ROUTING_BIN)
+
+## ---- Targets ---- ##
 all: $(NAME)
 
 $(NAME): $(OBJ)
@@ -29,7 +37,80 @@ $(NAME): $(OBJ)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
 
-clean:
+$(UNIT_ROUTING_UTIL_BIN): \
+		$(TEST_DIR)/test_routing_utils.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		src/RoutingUtils.cpp
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_routing_utils.cpp src/RoutingUtils.cpp -o $@
+
+$(UNIT_URI_UTIL_BIN): \
+		$(TEST_DIR)/test_uri_utils.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		src/UriUtils.cpp \
+		src/Http.cpp
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_uri_utils.cpp src/UriUtils.cpp src/Http.cpp -o $@
+
+$(UNIT_REQUEST_PARSER_BIN): \
+		$(TEST_DIR)/test_request_parser.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		src/RequestParser.cpp \
+		src/Utils.cpp \
+		src/UriUtils.cpp \
+		src/Http.cpp
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_request_parser.cpp src/RequestParser.cpp src/Utils.cpp src/UriUtils.cpp src/Http.cpp -o $@
+
+$(COMPO_ROUTING_BIN): \
+		$(TEST_DIR)/test_component_routing/test_routing.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		src/ClientRouting.cpp \
+		src/Client.cpp \
+		src/Http.cpp \
+		src/CGI.cpp \
+		src/Utils.cpp \
+		src/RequestParser.cpp \
+		src/RoutingUtils.cpp \
+		src/ResponseBuilder.cpp \
+		src/Logger.cpp \
+		src/UriUtils.cpp
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_component_routing/test_routing.cpp src/ClientRouting.cpp src/Client.cpp src/Http.cpp src/CGI.cpp src/Utils.cpp src/RequestParser.cpp src/RoutingUtils.cpp src/ResponseBuilder.cpp src/Logger.cpp src/UriUtils.cpp -o $@
+
+$(COMPONENT_BODY_LIMITS_BIN): $(TEST_DIR)/test_body_limits.cpp \
+		$(TEST_DIR)/TestRunner.hpp \
+		$(BODY_LIMITS_SRC) \
+		$(wildcard include/*.hpp)
+	mkdir -p $(TEST_BIN_DIR)
+	$(CXX) $(INCLUDE) $(CXXFLAGS) $(TEST_DIR)/test_body_limits.cpp $(BODY_LIMITS_SRC) -o $@
+
+test-routing-utils: $(UNIT_ROUTING_UTIL_BIN)
+	./$(UNIT_ROUTING_UTIL_BIN)
+
+test-uri-utils: $(UNIT_URI_UTIL_BIN)
+	./$(UNIT_URI_UTIL_BIN)
+
+test-request-parser: $(UNIT_REQUEST_PARSER_BIN)
+	./$(UNIT_REQUEST_PARSER_BIN)
+
+test-component-routing: $(COMPO_ROUTING_BIN)
+	./$(COMPO_ROUTING_BIN)
+test-body-limits: $(COMPONENT_BODY_LIMITS_BIN)
+	./$(COMPONENT_BODY_LIMITS_BIN) $(TEST_DIR)/fixtures/body_limits.conf
+
+######## ADD UNIT TESTS #############
+test-unit: test-routing-utils test-uri-utils test-request-parser
+
+test-component: test-component-routing test-body-limits test-cgi
+
+#### ADD OTHER LAYER OF TEST ####
+test: test-unit test-component
+
+clean-tests:
+	rm -rf $(TEST_BIN_DIR)
+
+clean: clean-tests
 	rm -f $(OBJ)
 
 fclean: clean
@@ -37,4 +118,13 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.PHONY: all clean fclean re test test-unit test-routing-utils test-uri-utils test-request-parser clean-tests test_component_routing test-body-limits
+
+# HTTP integration tests open local sockets; run separately from component tests.
+test-cgi:
+	sh $(TEST_DIR)/test_cgi/run.sh
+
+test-cgi-http: $(NAME)
+	python3 $(TEST_DIR)/test_cgi/test_http.py
+
+.PHONY: test-component test-component-routing test-cgi test-cgi-http

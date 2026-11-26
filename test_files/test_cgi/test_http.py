@@ -7,6 +7,7 @@ import http.client
 import os
 from pathlib import Path
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -99,6 +100,45 @@ sys.stdout.buffer.write(sys.stdin.buffer.read())
             assert request(port, '/large.py')[:2] == (200, b'x' * 262144)
             print('PASS: HTTP GET, binary/empty/chunked POST, index, status, cookies, redirect, errors, output limit')
 
+            # Preserve jdong's keep-alive and buffered-request handling before CGI.
+            connection = http.client.HTTPConnection('127.0.0.1', port, timeout=10)
+            try:
+                connection.request('GET', '/index.html')
+                response = connection.getresponse()
+                assert (response.status, response.read()) == (200, b'static works')
+                original_socket = connection.sock
+                connection.request('GET', '/echo.py?reused=yes')
+                response = connection.getresponse()
+                assert (response.status, response.read()) == (200, b'GET reused=yes\n')
+                assert response.getheader('Connection') == 'close'
+                assert original_socket is not None and connection.sock is None
+            finally:
+                connection.close()
+
+            with socket.create_connection(('127.0.0.1', port), timeout=10) as client:
+                client.sendall(b'GET /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n'
+                               b'GET /echo.py?pipelined=yes HTTP/1.1\r\nHost: localhost\r\n\r\n')
+                chunks = []
+                while True:
+                    chunk = client.recv(65536)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                first, second = b''.join(chunks).split(b'static works', 1)
+                assert first.startswith(b'HTTP/1.1 200 OK\r\n')
+                assert second.startswith(b'HTTP/1.1 200 OK\r\n')
+                assert second.endswith(b'GET pipelined=yes\n')
+
+            # A client may finish sending and still wait to receive its CGI response.
+            with socket.create_connection(('127.0.0.1', port), timeout=10) as client:
+                client.sendall(b'POST /echo.py?halfclosed=yes HTTP/1.1\r\nHost: localhost\r\n'
+                               b'Content-Length: 3\r\n\r\nabc')
+                client.shutdown(socket.SHUT_WR)
+                response = http.client.HTTPResponse(client)
+                response.begin()
+                assert (response.status, response.read()) == (200, b'POST halfclosed=yes\nabc')
+            print('PASS: keep-alive to CGI, pipelined static/CGI requests, half-closed POST')
+
             # A sleeping script must not block unrelated requests, and EOF alone is not completion.
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
                 started = time.monotonic()
@@ -122,7 +162,7 @@ sys.stdout.buffer.write(sys.stdin.buffer.read())
                 raise AssertionError('timed-out child was not reaped')
             print('PASS: five-second timeout, stdout EOF before exit, concurrent requests, child reaping')
 
-            # Closing a browser connection should promptly cancel its CGI process.
+            # A reset unambiguously disconnects the client; FIN also permits half-close.
             (work / 'child.pid').unlink()
             client = socket.create_connection(('127.0.0.1', port))
             client.sendall(b'GET /hang.py HTTP/1.1\r\nHost: localhost\r\n\r\n')
@@ -131,6 +171,7 @@ sys.stdout.buffer.write(sys.stdin.buffer.read())
                     break
                 time.sleep(0.02)
             pid = int((work / 'child.pid').read_text())
+            client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack('ii', 1, 0))
             client.close()
             for _ in range(150):
                 try:

@@ -3,15 +3,14 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <dirent.h>
+
 Client::Client(int fd, size_t serverIndex)
 	: _fd(fd),
-	  _cgiPipesRegistered(false),
 	  _serverIndex(serverIndex),
-	  _isConnected(true),
 	  _writeOffSet(0),
 	  _lastActivity(std::chrono::steady_clock::now())
 {
-	Logger::debug("client created: fd=" + std::to_string(fd));
+	std::cout << "A client is created fd: " << fd << std::endl;
 }
 
 Client::~Client(void)
@@ -39,9 +38,9 @@ size_t	Client::getEffectiveMaxBodySize(void) const
 	return _request.effectiveMaxBodySize;
 }
 
-bool	Client::getIsConnected(void) const
+bool	Client::getIsMarkedForClose() const
 {
-	return _isConnected;
+	return _isMarkedForClose;
 }
 
 const std::string& Client::getWriteBuffer() const
@@ -61,15 +60,6 @@ ssize_t Client::getWriteOffSet() const
 ClientState Client::getState() const
 {
 	return _state;
-}
-CGI& Client::getCGI()
-{
-	return _cgi;
-}
-
-const CGI& Client::getCGI() const
-{
-	return _cgi;
 }
 void Client::setState(ClientState st)
 {
@@ -91,19 +81,24 @@ void	Client::setEffectiveMaxBodySize(size_t size)
 	_request.effectiveMaxBodySize = size;
 }
 
-void Client::setCgiPipesRegistered(bool value)
+void	Client::setIsMarkedForClose(void)
 {
-	_cgiPipesRegistered = value;
+	_isMarkedForClose = true;
 }
 
-bool Client::getCgiPipesRegistered() const
+bool Client::getPeerReadClosed() const
 {
-	return _cgiPipesRegistered;
+    return _peerReadClosed;
 }
 
-void	Client::disConnected(void)
+void Client::setPeerReadClosed()
 {
-	_isConnected = false;
+    _peerReadClosed = true;
+}
+
+void Client::setCloseAfterResponse()
+{
+	_closeAfterResponse = true;
 }
 
 void	Client::appendReadBuffer(const char* data, size_t size)
@@ -112,10 +107,7 @@ void	Client::appendReadBuffer(const char* data, size_t size)
 }
 ParseStatus	Client::parseReadBuffer(void)
 {
-	ParseStatus status = _parser.parseRequest(_readBuffer, _request);
-	if (status == COMPLETE)
-		_readBuffer.clear();
-	return status;
+	return _parser.parseRequest(_readBuffer, _request);
 }
 
 void	Client::matchLocation(const std::vector<LocationConfig>& locations)
@@ -147,50 +139,55 @@ void	Client::matchLocation(const std::vector<LocationConfig>& locations)
 }
 void Client::prepareResponseForSending()
 {
-	// CGI currently serves one request per connection, including timeout/error responses.
-	if (_cgiPipesRegistered)
+	if (_closeAfterResponse)
 		_response.headers["Connection"] = "close";
 	_writeBuffer = _builder.serialize(_response);
 	_writeOffSet = 0;
 	_state = SENDING_RESPONSE;
 }
-//enum	ConfigBehavior
-//{
-//	REDIRECT,
-//	CGI,
-//	UPLOAD,
-//	DELETE,
-//	DIRECTORU_LISTING,
-//	STATIC
-//};
-
-// ConfigBehavior checkConfigBehavior(const ServerConfig& sc, const LocationConfig& lc, const Request& req)
-// {
-// 	std::string root = sc.root;
-// 	if (lc.root.size() != 0)
-// 		root = lc.root;
-// 	root + lc.path;
-// 	if (lc.cgiHandlers.size() != 0)
-// }
-
-// void Client::routing(const ServerConfig& serverConfig)
-// {
-// 	if(_request.httpStatus != REQ_OK)
-// 	{
-// 		_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), serverConfig);
-// 	}
-// 	else
-// 	{
-// 		ConfigBehavior action = checkConfigBehavior(serverConfig, serverConfig.locations[_locationIndex], _request);
-// 	}
-// 	//else
-// 	//	_response = _builder.buildResponse(_request, serverConfig);
-// 	//_writeBuffer = _builder.serialize(_response);
-// }
 
 void	Client::updateLastActivity(void)
 {
 	_lastActivity = std::chrono::steady_clock::now();
+}
+
+bool needToClose(const std::string& value)
+{
+	size_t comma = 0;
+	size_t start = 0;
+	std::string token;
+	while (start < value.size())
+	{
+		comma = value.find(',', start);
+		if (comma == std::string::npos)
+			comma = value.size();
+
+		token = Utils::toLower(Utils::trim(value.substr(start, comma - start)));
+		if (token == "close")
+			return true;
+		start = comma + 1;
+	}
+	return false;
+}
+
+bool	Client::resetClient()
+{
+	if (_closeAfterResponse)
+		return false;
+
+	std::map<std::string, std::string>::const_iterator it = _request.headers.find("connection");
+	if (it != _request.headers.end() && needToClose(it->second))
+		return false;
+
+	_readBuffer.erase(0, _parser.getConsumedBytes());
+	_writeBuffer.clear();
+	_writeOffSet = 0;
+	_locationIndex = static_cast<size_t>(-1);
+	_request.clear();
+	_parser.reset();
+	// no? _builder.clear()
+	_state = READ_REQ;
+	return true;
 }
 
 const std::string& Client::getRequestBody() const
@@ -298,4 +295,24 @@ void Client::finishCGI(const ServerConfig& serverConfig)
 	_response = response;
 	prepareResponseForSending();
 	_writeBuffer.insert(_writeBuffer.find("\r\n\r\n") + 2, headers);
+}
+
+CGI& Client::getCGI()
+{
+	return _cgi;
+}
+
+const CGI& Client::getCGI() const
+{
+	return _cgi;
+}
+
+void Client::setCgiPipesRegistered(bool value)
+{
+	_cgiPipesRegistered = value;
+}
+
+bool Client::getCgiPipesRegistered() const
+{
+	return _cgiPipesRegistered;
 }

@@ -159,6 +159,7 @@ Response ResponseBuilder::buildCreatedResponse(const std::string& location)
 	return response;
 }
 
+// TODO: fix 3 fail cases
 Response ResponseBuilder::buildListingResponse(const std::vector<std::string>& list, const std::string& requestPath)
 {
 	Response response;

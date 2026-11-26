@@ -146,6 +146,8 @@ int main(int argc, char **argv)
 		file = "config/default.conf";
 	try
 	{
+		Server::installSignals();
+
 		ConfigParser parser;
 		// parseConfig need to adapt error_page
 		std::vector<ServerConfig> configs = parser.parseConfig(file);
@@ -159,11 +161,17 @@ int main(int argc, char **argv)
 
 		Server server(configs);
 		server.start();
+		return 0;
+	}
+	catch (const Server::ServerException&)
+	{
+		// reason is being logged at error functions. no logging here.
+		return 1;
 	}
 	catch (const std::exception& e)
 	{
-		Logger::fatal(std::string("server startup failed: ") + e.what());
+		// catch config parsing errors.
+		Logger::fatal(e.what());
 		return 1;
 	}
-	return 0;
 }

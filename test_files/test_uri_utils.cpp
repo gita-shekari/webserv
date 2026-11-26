@@ -1,68 +1,172 @@
 #include "UriUtils.hpp"
+#include "TestRunner.hpp"
 
 #include <iostream>
 
-void	testPE(const std::string& input)
+static void testValidatePercentEncoding(TestRunner& tests)
 {
-	bool	result = UriUtils::validatePercentEncoding(input);
+    tests.checkTrue(
+        "plain path is valid",
+        UriUtils::validatePercentEncoding("/hello")
+    );
 
-	std::cout << "input: " << input
-				<< " | success: " << result << std::endl;
+    tests.checkTrue(
+        "valid uppercase hex encoding",
+        UriUtils::validatePercentEncoding("/hello%20world")
+    );
+
+    tests.checkTrue(
+        "valid lowercase hex encoding",
+        UriUtils::validatePercentEncoding("/%2e")
+    );
+
+    tests.checkTrue(
+        "trailing percent is rejected",
+        !UriUtils::validatePercentEncoding("/hello%")
+    );
+
+    tests.checkTrue(
+        "incomplete encoding is rejected",
+        !UriUtils::validatePercentEncoding("/hello%2")
+    );
+
+    tests.checkTrue(
+        "non-hex encoding is rejected",
+        !UriUtils::validatePercentEncoding("/hello%GG")
+    );
 }
 
-
-void testDecode(const std::string& input, std::string& output)
+static void testPercentDecode(TestRunner& tests)
 {
-	bool result = UriUtils::percentDecode(input, output);
+    std::string output;
 
-	std::cout
-		<< "decode: " << input
-		<< " | result: " << output
-		<< " | success: " << result << std::endl;
+    bool success = UriUtils::percentDecode(
+        "/hello%20world",
+        output
+    );
+
+    tests.checkTrue("encoded space is decoded", success);
+    tests.checkEqual(
+        "decoded path contains space",
+        std::string("/hello world"),
+        output
+    );
+
+    tests.checkTrue(
+        "encoded slash is rejected",
+        !UriUtils::percentDecode("/hello%2Fworld", output)
+    );
+
+    tests.checkTrue(
+        "encoded backslash is rejected",
+        !UriUtils::percentDecode("/hello%5Cworld", output)
+    );
 }
 
-void testDecodedPath(const std::string& output)
+static void testValidateDecodedPath(TestRunner& tests)
 {
-	bool result = UriUtils::validateDecodedPath(output);
+    tests.checkTrue(
+        "normal absolute path is valid",
+        UriUtils::validateDecodedPath("/images/logo.png")
+    );
 
-	std::cout
-		<< "decoded path: " << output
-		<< " | success: " << result << std::endl;
+    tests.checkTrue(
+        "root path is valid",
+        UriUtils::validateDecodedPath("/")
+    );
+
+    tests.checkTrue(
+        "empty path is rejected",
+        !UriUtils::validateDecodedPath("")
+    );
+
+    tests.checkTrue(
+        "relative path is rejected",
+        !UriUtils::validateDecodedPath("images/logo.png")
+    );
+
+    std::string pathWithNul("/hello\0world", 12);
+
+    tests.checkTrue(
+        "NUL byte is rejected",
+        !UriUtils::validateDecodedPath(pathWithNul)
+    );
+
+    std::string pathWithNewline = "/hello";
+    pathWithNewline += '\n';
+    pathWithNewline += "world";
+
+    tests.checkTrue(
+        "newline control character is rejected",
+        !UriUtils::validateDecodedPath(pathWithNewline)
+    );
+
+    std::string pathWithDel = "/hello";
+    pathWithDel += static_cast<char>(127);
+
+    tests.checkTrue(
+        "DEL control character is rejected",
+        !UriUtils::validateDecodedPath(pathWithDel)
+    );
 }
 
-void testNormalize(const std::string& input, std::string& output)
+static void testNormalizePath(TestRunner& tests)
 {
-	bool result = UriUtils::normalizePath(input, output);
+    std::string output;
 
-	std::cout
-		<< " | result: " << output
-		<< " | success: " << result
-		<< std::endl;
+    bool success = UriUtils::normalizePath(
+        "/a//b/./c",
+        output
+    );
+
+    tests.checkTrue("normalization succeeds", success);
+    tests.checkEqual(
+        "duplicate slash and dot are removed",
+        std::string("/a/b/c"),
+        output
+    );
+
+    tests.checkTrue(
+        "path cannot escape root",
+        !UriUtils::normalizePath("/../etc", output)
+    );
+}
+
+static void testHandleRawTarget(TestRunner& tests)
+{
+
+	Request request;
+	request.rawTarget =
+		"//a/%2e%2e/b?name=hello%20world";
+
+	bool success = UriUtils::handleRawTarget(request);
+
+	tests.checkTrue("raw target is processed", success);
+	tests.checkEqual("path is normalized", std::string("/b"), request.path);
+	tests.checkEqual(
+		"query remains encoded",
+		std::string("name=hello%20world"),
+		request.query
+	);
+
+	Request request_fail;
+	request_fail.rawTarget = "/hello%GG";
+
+	tests.checkTrue(
+		"invalid encoding rejects raw target",
+		!UriUtils::handleRawTarget(request_fail)
+	);
 }
 
 int	main(void)
 {
-	// //test step by step
-	// const std::string input = "//a/%2e%2e/%2e%2e/etc";
+	TestRunner tests;
 
-	// std::string decoded;
-	// std::string output;
+	testValidatePercentEncoding(tests);
+    testPercentDecode(tests);
+    testValidateDecodedPath(tests);
+    testNormalizePath(tests);
+    testHandleRawTarget(tests);
 
-	// testPE(input);
-	// testDecode(input, decoded);
-	// testDecodedPath(decoded);
-	// testNormalize(decoded, output);
-
-
-	// overall test for req.rawTarget
-	Request req;
-	req.rawTarget = "//a/%2e%2e/b?name=hello%20world";
-
-	bool result = UriUtils::handleRawTarget(req);
-
-	std::cout << result << std::endl;
-	std::cout << "req.path= " << req.path << std::endl;
-	std::cout << "req.query= " << req.query << std::endl;
-	
-	return 0;
+	return tests.finish();
 }

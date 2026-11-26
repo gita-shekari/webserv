@@ -1,68 +1,6 @@
 #include "Server.hpp"
-#include <map>
 #include <csignal>
 #include <sys/wait.h>
-
-bool	Server::isCgiPipeFd(int fd)
-{
-	std::map<int, int>::const_iterator it = _pipeFds.find(fd);
-	if (it == _pipeFds.end())
-		return false;
-	return true;
-}
-
-Client& Server::getBelongedClient(int fd)
-{
-	std::map<int, int>::const_iterator it = _pipeFds.find(fd);
-	if (it == _pipeFds.end())
-	{
-		Logger::fatal("event registry invariant violated: pollfd as pipefd has no valid owner");
-		throw ServerException();
-	}
-	int clientFd = it->second;
-	return (getClient(clientFd));
-}
-void Server::handleEvent(pollfd& pfd, short& revents, Client& client)
-{
-	if (revents & POLLIN)
-	{
-		if (client.getState() == READ_REQ)
-		{
-			if (!receiveClientData(client))
-				return;
-		}
-		if (client.getState() == REQ_READY)
-			client.routing(_config[client.getServerIndex()]);
-	}
-
-	if (client.getState() == CGI_RUNNING && !client.getCgiPipesRegistered())
-	{
-		// Adding pipes can reallocate _pollfds: do not use pfd again afterward.
-		pfd.events = 0;
-		registerCgiPipes(client);
-		return;
-	}
-
-	if (client.getState() == RESPONSE_READY)
-	{
-		client.prepareResponseForSending();
-		pfd.events |= POLLOUT;
-	}
-
-	if (revents & POLLOUT)
-	{
-		if (client.getState() == SENDING_RESPONSE)
-		{
-			if (!sendClientData(client))
-				return;
-
-			pfd.events &= ~POLLOUT;
-			// CGI responses use Connection: close; close only after the full buffer is sent.
-			if (client.getCgiPipesRegistered())
-				markForClose(client.getFd());
-		}
-	}
-}
 
 // Closing a pipe marks its slot unused. Erasing slots now would skip events in this poll batch.
 void Server::removeCgiPipe(int fd)
@@ -83,20 +21,6 @@ void Server::removeCgiPipe(int fd)
 	close(fd);
 }
 
-void Server::cleanupCGI(Client& client)
-{
-	CGI& cgi = client.getCGI();
-	removeCgiPipe(cgi.getInputFd());
-	removeCgiPipe(cgi.getOutputFd());
-	if (cgi.getPid() > 0 && cgi.getExitStatus() == -1)
-	{
-		// Never wait for a running script inside the event loop, even during disconnect cleanup.
-		kill(cgi.getPid(), SIGKILL);
-		_cgiToReap.push_back(cgi.getPid());
-	}
-	cgi.reset();
-}
-
 void Server::prepareClientResponse(Client& client)
 {
 	if (client.getState() == RESPONSE_READY)
@@ -107,14 +31,15 @@ void Server::prepareClientResponse(Client& client)
 		if (_pollfds[i].fd == client.getFd())
 		{
 			_pollfds[i].events = POLLOUT;
-			break;
+			return;
 		}
 	}
+	addPollFds(client.getFd(), POLLOUT);
 }
 
 void Server::failCGI(Client& client, HttpStatus status)
 {
-	cleanupCGI(client);
+	cleanupCgi(client.getFd());
 	client.handleErrorResponse(_config[client.getServerIndex()], status);
 	prepareClientResponse(client);
 }
@@ -122,7 +47,7 @@ void Server::failCGI(Client& client, HttpStatus status)
 void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 {
 	Client& client = getBelongedClient(pfd.fd);
-	if (!client.getIsConnected() || client.getState() != CGI_RUNNING)
+	if (client.getIsMarkedForClose() || client.getState() != CGI_RUNNING)
 		return;
 	CGI& cgi = client.getCGI();
 	if (revents & POLLNVAL)
@@ -185,7 +110,19 @@ void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
 void Server::registerCgiPipes(Client& client)
 {
 	CGI& cgi = client.getCGI();
-	// This flag also tells the send path to close this CGI connection after the response.
+	if (client.getPeerReadClosed())
+	{
+		for (size_t i = 0; i < _pollfds.size(); ++i)
+		{
+			if (_pollfds[i].fd == client.getFd())
+			{
+				_pollfds[i].fd = -1;
+				_pollfds[i].events = 0;
+				break;
+			}
+		}
+	}
+	// Register each CGI job only once.
 	client.setCgiPipesRegistered(true);
 	if (cgi.getInputFd() == -1 || cgi.getOutputFd() == -1)
 		return failCGI(client, INTERNAL_SERVER_ERR);
@@ -220,7 +157,7 @@ void Server::checkCgiProcesses()
 	for (std::map<int, Client>::iterator it = _clients.begin(); it != _clients.end(); ++it)
 	{
 		Client& client = it->second;
-		if (!client.getIsConnected() || client.getState() != CGI_RUNNING)
+		if (client.getIsMarkedForClose() || client.getState() != CGI_RUNNING)
 			continue;
 		CGI& cgi = client.getCGI();
 		if (cgi.getExitStatus() == -1)
@@ -246,7 +183,7 @@ void Server::checkCgiProcesses()
 		if (cgi.getOutputFd() == -1 && cgi.getExitStatus() != -1)
 		{
 			client.finishCGI(_config[client.getServerIndex()]);
-			cleanupCGI(client);
+			cleanupCgi(client.getFd());
 			prepareClientResponse(client);
 			continue;
 		}

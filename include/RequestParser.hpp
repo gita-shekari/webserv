@@ -1,6 +1,7 @@
 #pragma once
 
 # include "Http.hpp"
+# include "Utils.hpp"
 
 enum	ParseStatus
 {
@@ -28,7 +29,8 @@ enum	BodyType
 enum	ChunkState
 {
 	CHUNK_SIZE,
-	CHUNK_DATA
+	CHUNK_DATA,
+	CHUNK_END
 };
 
 class RequestParser
@@ -53,18 +55,14 @@ class RequestParser
 		ParseStatus error(Request& req, HttpStatus status);
 		ParseStatus	parseRequestLine(const std::string& buffer, Request& req);
 		ParseStatus	parseHeaders(const std::string& buffer, Request& req);
-		ParseStatus	parseBody(const std::string& buffer, Request& req, size_t maxBodySize);
+		ParseStatus	parseBody(const std::string& buffer, Request& req);
 
 		ParseStatus	judgeBody(Request& req);
 
 		ParseStatus	parseContentLengthBody(const std::string& buffer, Request& req);
-		ParseStatus	parseChunkedBody(const std::string& buffer, Request& req,  size_t maxBodySize);
+		ParseStatus	parseChunkedBody(const std::string& buffer, Request& req);
 
 		//parse size
 		bool	parseDecSize(const std::string& str, size_t& size);
 		bool	parseHexSize(const std::string& str, size_t& size);
-
-		//utils
-		std::string	toLower(const std::string& str);
-		std::string	trim(const std::string& str);
 };

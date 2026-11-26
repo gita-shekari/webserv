@@ -5,14 +5,6 @@
 #include <cctype>
 #include <limits>
 
-std::string	toUpper(const std::string& str)
-{
-	std::string	ret = str;
-	for (size_t i = 0; i < ret.size(); ++i)
-		ret[i] = std::toupper(static_cast<unsigned char>(ret[i]));
-	return ret;
-}
-
 RequestParser::RequestParser(): _section(REQUEST_LINE), _cursor(0), _contentLength(0), _body(NO_BODY), _chunkState(CHUNK_SIZE), _chunkSize(0){}
 
 ParseStatus	RequestParser::parseRequest(const std::string& buffer, Request& req)
@@ -26,7 +18,7 @@ ParseStatus	RequestParser::parseRequest(const std::string& buffer, Request& req)
 		else if (_section == HEADERS)
 			status = parseHeaders(buffer, req);
 		else if (_section == BODY)
-			status = parseBody(buffer, req, req.effectiveMaxBodySize);
+			status = parseBody(buffer, req);
 		else // how can _section == DONE
 			return ERROR;
 		if (status != COMPLETE)
@@ -109,7 +101,7 @@ ParseStatus	RequestParser::parseRequestLine(const std::string& buffer, Request& 
 		|| secondSpace + 1 >= line.size())
 		return error(req, BAD_REQ);
 		
-	req.method = toUpper(line.substr(0, firstSpace));
+	req.method = Utils::toUpper(line.substr(0, firstSpace));
 	req.rawTarget = line.substr(firstSpace + 1, secondSpace - firstSpace - 1);
 	req.version = line.substr(secondSpace + 1);
 	if (req.version != "HTTP/1.1")
@@ -144,9 +136,9 @@ ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 		std::string	key = line.substr(0, colon);
 		if (key[0] == ' ' || key[0] == '\t' || key[key.size() - 1] == ' ' || key[key.size() - 1] == '\t')
 			return error(req, BAD_REQ);
-		key = toLower(key);
+		key = Utils::toLower(key);
 
-		std::string	value = trim(line.substr(colon + 1));
+		std::string	value = Utils::trim(line.substr(colon + 1));
 
 		std::map<std::string, std::string>::iterator it;
 		it = req.headers.find(key);
@@ -168,12 +160,12 @@ ParseStatus	RequestParser::parseHeaders(const std::string& buffer, Request& req)
 	return (judgeBody(req));
 }
 
-ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req, size_t maxBodySize)
+ParseStatus	RequestParser::parseBody(const std::string& buffer, Request& req)
 {
 	if (_body == CONTENT_LENGTH_BODY)
 		return parseContentLengthBody(buffer, req);
 	if (_body == CHUNKED_BODY)
-		return parseChunkedBody(buffer, req, maxBodySize);
+		return parseChunkedBody(buffer, req);
 	return ERROR;
 }
 
@@ -186,7 +178,7 @@ ParseStatus	RequestParser::judgeBody(Request& req)
 
 	if (itTE != req.headers.end())
 	{
-		if (toLower(itTE->second) != "chunked")
+		if (Utils::toLower(itTE->second) != "chunked")
 			return error(req, NOT_IMPLEMENTED);
 		if (itCL != req.headers.end())
 			return error(req, BAD_REQ);
@@ -209,6 +201,8 @@ ParseStatus	RequestParser::judgeBody(Request& req)
 
 ParseStatus	RequestParser::parseContentLengthBody(const std::string& buffer, Request& req)
 {
+	if (_contentLength > req.effectiveMaxBodySize)
+		return error(req, PAYLOAD_TOO_LARGE);
 	size_t	bodyLength = buffer.size() - _cursor;
 	if (bodyLength < _contentLength)
 		return INCOMPLETE;
@@ -218,7 +212,7 @@ ParseStatus	RequestParser::parseContentLengthBody(const std::string& buffer, Req
 	return COMPLETE;
 }
 
-ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req, size_t maxBodySize)
+ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& req)
 {
 	while (true)
 	{
@@ -239,18 +233,15 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 			if (!parseHexSize(sizeNum, _chunkSize))
 				return error(req, BAD_REQ);
 			_cursor = sizeEnd + 2;
+			if (req.body.size() > req.effectiveMaxBodySize
+				|| _chunkSize > req.effectiveMaxBodySize - req.body.size())
+				return error(req, PAYLOAD_TOO_LARGE);
 			if (_chunkSize == 0)
-			{
-				if (buffer.size() - _cursor < 2)
-					return INCOMPLETE;
-				if (buffer[_cursor] != '\r' || buffer[_cursor + 1] != '\n')
-					return error(req, BAD_REQ);
-				_cursor += 2;
-				_section = DONE;
-				return COMPLETE;
-			}
-			_chunkState = CHUNK_DATA;
+				_chunkState = CHUNK_END;
+			else
+				_chunkState = CHUNK_DATA;
 		}
+
 		if (_chunkState == CHUNK_DATA)
 		{
 			size_t	bodyLength = buffer.size() - _cursor;
@@ -258,11 +249,20 @@ ParseStatus	RequestParser::parseChunkedBody(const std::string& buffer, Request& 
 				return INCOMPLETE;
 			if (buffer[_cursor + _chunkSize] != '\r' || buffer[_cursor + _chunkSize + 1] != '\n')
 				return error(req, BAD_REQ);
-			if (req.body.size() > maxBodySize || _chunkSize > maxBodySize - req.body.size())
-				return error(req, PLAYLOAD_TOO_LARGE);
 			req.body.append(buffer, _cursor, _chunkSize);
 			_cursor += _chunkSize + 2;
 			_chunkState = CHUNK_SIZE;
+		}
+
+		if (_chunkState == CHUNK_END)
+		{
+				if (buffer.size() - _cursor < 2)
+					return INCOMPLETE;
+				if (buffer[_cursor] != '\r' || buffer[_cursor + 1] != '\n')
+					return error(req, BAD_REQ);
+				_cursor += 2;
+				_section = DONE;
+				return COMPLETE;
 		}
 	}
 }
@@ -309,24 +309,4 @@ bool	RequestParser::parseHexSize(const std::string& str, size_t& size)
 	}
 	size = ret;
 	return true;
-}
-
-std::string	RequestParser::toLower(const std::string& str)
-{
-	std::string	ret = str;
-	for (size_t i = 0; i < ret.size(); ++i)
-		ret[i] = std::tolower(static_cast<unsigned char>(ret[i]));
-	return ret;
-}
-
-std::string	RequestParser::trim(const std::string& str)
-{
-	size_t	start = 0;
-	size_t	end = str.size();
-
-	while (start < end && (str[start] == ' ' || str[start] == '\t'))
-		++start;
-	while (end >start && (str[end - 1] == ' ' || str[end - 1] == '\t'))
-		--end;
-	return str.substr(start, end - start);
 }

@@ -3,6 +3,7 @@
 # include "Http.hpp"
 # include "RequestParser.hpp"
 # include "ResponseBuilder.hpp"
+# include "Utils.hpp"
 #include "CGI.hpp"
 #include <sys/stat.h>
 #include <dirent.h>
@@ -46,33 +47,35 @@ class Client
 		~Client(void);
 
 		//getters
-		int					getFd(void) const;
-		size_t				getServerIndex(void) const;
-		size_t				getLocationIndex(void) const;
-		size_t				getEffectiveMaxBodySize(void) const;
-		bool				getIsConnected(void) const;
-		const std::string&	getWriteBuffer() const;
+		int			getFd(void) const;
+		size_t		getServerIndex(void) const;
+		size_t		getLocationIndex(void) const;
+		size_t		getEffectiveMaxBodySize(void) const;
+		bool		getIsMarkedForClose() const;
+		const std::string& getWriteBuffer() const;
 		// no one is using getReq()?
-		Request				getReq(void) const;
+		Request		getReq(void) const;
 		std::chrono::steady_clock::time_point	getLastActivity(void) const;
-		ssize_t				getWriteOffSet() const;
-		bool 				getResponseisReady() const;
-		ClientState			getState() const;
-		bool				getCgiPipesRegistered() const;
-		CGI&				getCGI();
-		const CGI&			getCGI() const;
+		ssize_t		getWriteOffSet() const;
+		bool 		getResponseisReady() const;
+		ClientState getState() const;
+		bool		getPeerReadClosed() const;
 
-		// Avoid copying a large POST body on each writable pipe event.
+
+		CGI& getCGI();
+		const CGI& getCGI() const;
+		bool getCgiPipesRegistered() const;
+		void setCgiPipesRegistered(bool value);
 		const std::string& getRequestBody() const;
-		// Convert CGI headers and body into an HTTP response.
 		void finishCGI(const ServerConfig& serverConfig);
 
 		// setters
 		void		setEffectiveMaxBodySize(size_t size);
-		void		disConnected(void);
+		void		setIsMarkedForClose(void);
 		void		setWriteOffSet(ssize_t byte);
 		void		setState(ClientState st);
-		void		setCgiPipesRegistered(bool value);
+		void		setPeerReadClosed();
+		void		setCloseAfterResponse();
 
 		// client util
 		bool		isURIAllowed(struct stat* buf, std::string path);
@@ -88,32 +91,35 @@ class Client
 		void		routingDelete(const ServerConfig& sc, std::string& fullPath);
 
 		void		handleErrorResponse(const ServerConfig& sc, HttpStatus code);
-		bool		isDirectoryEntry(const std::string& fullPath, const std::string& name);
-		bool		readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std::string>& entries);
-		void		handleDirectoryOpenError(const ServerConfig& serverConfig);
 		void		handleDirectoryListing(const ServerConfig& serverConfig, const std::string& fullPath);
 		void		handleCGI(const ServerConfig& serverConfig, const LocationConfig& lc, const std::string& scriptPath);
 		void		handleStatic(const ServerConfig& serverConfig, const std::string& filePath);
 		void		handleRedirect(int code, const std::string& redirURI);
 		void		handleDelete(const ServerConfig& serverConfig, const std::string& filePath);
 		void		handleUpload(const ServerConfig& serverConfig, const LocationConfig& lc);
+
 		void		prepareResponseForSending();
 		void		updateLastActivity(void);
 
+		bool		resetClient();
+
 	private:
 		int				_fd = -1;
-		bool			_cgiPipesRegistered;
 		size_t			_serverIndex;
 		size_t			_locationIndex = static_cast<size_t>(-1);
-		bool			_isConnected = false;
+		bool			_isMarkedForClose = false;
 		std::string		_readBuffer;
 		std::string		_writeBuffer;
 		ssize_t			_writeOffSet;
-		CGI				_cgi;
+		bool			_peerReadClosed = false;
+		bool			_closeAfterResponse = false;
+
+		CGI _cgi;
+		bool _cgiPipesRegistered = false;
 		Request			_request; //current request
 		RequestParser	_parser;
 		Response		_response;
 		ResponseBuilder	_builder;
-		ClientState		_state = READ_REQ; // New connections start by parsing a request.
+		ClientState		_state = READ_REQ;
 		std::chrono::steady_clock::time_point	_lastActivity;
 };

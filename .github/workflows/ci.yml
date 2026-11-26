@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    name: Build (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - g++
+          - clang++
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build webserv
+        run: make CXX=${{ matrix.compiler }}
+
+  tests:
+    name: Unit and component tests (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - g++
+          - clang++
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run all unit tests
+        run: make test-unit CXX=${{ matrix.compiler }}
+
+      - name: Run component tests
+        run: make test-component CXX=${{ matrix.compiler }}
