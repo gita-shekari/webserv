@@ -55,6 +55,7 @@ void	Server::runningLoop(void)
 		// TODO: Delete at clean up code at the end: this if res > 0 is not necessory
 		if (res > 0)
 		{
+			bool finishedPipe = false;
 			for (size_t i = 0; i < polledFdCount && !stopRequested(); i++)
 			{
 				short revents = _pollfds[i].revents;
@@ -63,13 +64,16 @@ void	Server::runningLoop(void)
 				if (revents == 0)
 					continue;
 
-				if (handlePollException(fd, revents))
-					continue;
-
 				if (isListeningFd(fd))
 				{
-					if (revents & POLLIN)
-						acceptNewClient(fd);
+					handleListeningEvent(revents, fd);
+					continue;
+				}
+
+				if (isClientFd(fd))
+				{
+					Client& client = getClient(fd);
+					handleClientEvent(_pollfds[i], revents, client);
 					continue;
 				}
 
@@ -77,19 +81,15 @@ void	Server::runningLoop(void)
 				if (isCgiPipeFd(fd))
 				{
 					handleCgiPipeEvent(_pollfds[i], revents);
+					finishedPipe |= _pollfds[i].fd == -1;
 					continue;
-				}
-
-				if (!isClientFd(fd))
-					continue;
-
-				Client& client = getClient(fd);
-				handleEvent(_pollfds[i], revents, client);
+				}				
 			}
+			if (finishedPipe)
+				removePollFd(-1);
 		}
 		//TODO:: checkCgiProcesses();
 		checkTimeouts();
-		//todo: check how the macro works with revents.
 		removeMarkedClients();
 	}
 	_isRunning = false;
@@ -120,52 +120,6 @@ void	Server::handlePollCallError(int& eagainCount)
 	}
 	Logger::systemError(Logger::FATAL, "poll failed", saveErr);
 	throw ServerException();
-}
-
-bool	Server::handlePollException(int fd, short revents)
-{
-	if (!(revents & (POLLNVAL | POLLERR | POLLHUP)))
-		return false; // no exceptions found, continue with runningLoop()
-	// TODO: This need to be changed. because it might be the pipefd. 
-	if (!isListeningFd(fd) && !isClientFd(fd))
-	{
-		Logger::fatal("event registry invariant violated: fd has no valid owner");
-		throw ServerException();
-	}
-	if (isListeningFd(fd))
-	{
-		std::string event;
-		if (revents & POLLNVAL)
-			event = "POLLNVAL";
-		else if (revents & POLLERR)
-			event = "POLLERR";
-		else
-			event = "POLLHUP";
-		Logger::fatal("listening socket reported at poll() as " + event + ".\n");
-		throw ServerException();
-	}
-	if (revents & POLLNVAL)
-	{
-		Logger::error("poll returned POLLNVAL: invalid registered fd="
-			+ std::to_string(fd) + " action=close_client");
-		markForClose(fd);
-		return true;
-	}
-	if (revents & POLLERR)
-	{
-		Logger::warning("client socket reported POLLERR: fd="
-			+ std::to_string(fd) + " action=close_client");
-		markForClose(fd);
-		return true;
-	}
-	if (revents & POLLHUP)
-	{
-		Logger::info("client socket hangup: fd="
-			+ std::to_string(fd) + " action=close_client");
-		markForClose(fd);
-		return true;
-	}
-	return false;
 }
 
 bool	Server::setNonBlocking(int fd)

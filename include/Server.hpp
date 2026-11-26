@@ -45,6 +45,7 @@ class Server
 			const char* what() const noexcept override;
 		};
 
+
 		//todo: no use
 		bool	getRunning(void);
 
@@ -69,7 +70,6 @@ class Server
 		//1. server lifecycle / event loop
 		void	runningLoop();
 		void 	handlePollCallError(int& eagainCount);
-		bool	handlePollException(int fd, short revents);
 		bool	setNonBlocking(int fd);
 		void	addPollFds(int fd, short events);
 		void	checkTimeouts(void);
@@ -90,8 +90,10 @@ class Server
 		//4. event handling / CGI
 		bool	isCgiPipeFd(int fd);
 		Client& getBelongedClient(int fd);
-		void	handleEvent(pollfd& pfd, short& revents, Client& client);
+		void	handleClientEvent(pollfd& pfd, short& revents, Client& client);
 		void	handleCgiPipeEvent(pollfd& pfd, short& revents);
+		void 	handleListeningEvent(short revents, int fd);
+		void	processClientRequest(pollfd& pfd, Client& client);
 
 		//5. resource cleanup
 		void	markForClose(int fd);
