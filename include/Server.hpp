@@ -35,6 +35,15 @@ class Server
 
 		//parse client request (is public for tests)
 		ParseStatus	parseClientRequest(Client& client);
+		void	registerCgiPipes(Client& client);
+
+		// Defer pipe removal so dispatch never invalidates poll vector indices.
+		void	removeCgiPipe(int fd);
+		// TODO:: Gita have this conflicting with cleanupCgi()
+		void	cleanupCGI(Client& client);
+		void	failCGI(Client& client, HttpStatus status);
+		void	checkCgiProcesses();
+		void	prepareClientResponse(Client& client);
 
 		//Server Signals
 		static void	installSignals();
@@ -51,6 +60,7 @@ class Server
 
 	private:
 		static const int	CLIENT_TIMEOUT_SEC = 30;
+		static const int	CGI_TIMEOUT_SEC = 5; // Absolute deadline, even if output keeps arriving.
 		static const int	POLL_TIMEOUT_MS = 1000;
 		static const size_t	MAX_ACCEPTS_PER_EVENT = 32;
 
@@ -62,7 +72,9 @@ class Server
 		std::map<int, Client>						_clients;
 		std::map<int, int>							_pipeFds;
 
-		//prevent copying
+		// Reap killed children without blocking the event loop.
+		std::vector<pid_t> _cgiToReap;
+
 		Server(void);
 		Server(const Server&);
 		Server& operator=(const Server&);

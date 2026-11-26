@@ -4,6 +4,8 @@
 Server::Server(const std::vector<ServerConfig>& config)
 	: _isRunning(false), _config(config)
 {
+	// A CGI may close stdin early. Treat a failed pipe write as EPIPE, not server termination.
+	//TODO:: this funciton was in gita code .signal(SIGPIPE, SIG_IGN);
 	Logger::debug("server object created");
 }
 
@@ -12,6 +14,31 @@ Server::~Server()
 	shutdown();
 	Logger::info("server stopped");
 }
+// TODO:: below was in Gita's code: Need server shutdown function.
+//Server::~Server(void)
+//{
+//	for (std::map<int, size_t>::iterator it = _listeners.begin();
+//		it != _listeners.end(); 
+//		++it)
+//		close(it->first);
+
+//	for (std::map<int, Client>::iterator it = _clients.begin();
+//		it != _clients.end();
+//		++it)
+//	{
+//		// Shutdown owns every remaining CGI pipe and child, just like client disconnect cleanup.
+//		cleanupCGI(it->second);
+//		close(it->first);
+//	}
+//	for (size_t i = 0; i < _cgiToReap.size(); ++i)
+//	{
+//		// At shutdown there is no event loop left; the killed children must be reaped here.
+//		while (waitpid(_cgiToReap[i], NULL, 0) == -1 && errno == EINTR)
+//		{}
+//	}
+//	// not only close socket, also need to check pullfd and clients in case of throw exception destructor.
+//	Logger::info("server stopped");
+//}
 
 int	Server::start()
 {
@@ -76,7 +103,6 @@ void	Server::runningLoop(void)
 					continue;
 				}
 
-				// TODO: to be created
 				if (isCgiPipeFd(fd))
 				{
 					handleCgiPipeEvent(_pollfds[i], revents);
@@ -87,6 +113,10 @@ void	Server::runningLoop(void)
 		//TODO:: checkCgiProcesses();
 		checkTimeouts();
 		removeMarkedClients();
+		// Dispatch is finished, so removing retired pipe slots can no longer skip an event.
+		//TODO:: gita add this - maybe combine with cleanup
+		_pollfds.erase(std::remove_if(_pollfds.begin(), _pollfds.end(),
+			[](const pollfd& pfd) { return pfd.fd == -1; }), _pollfds.end());
 	}
 	_isRunning = false;
 }

@@ -80,6 +80,8 @@ std::string ResponseBuilder::getReasonPhrase(int statusCode)
 		case 405: return "Method Not Allowed";
 		case 413: return "Payload Too Large";
 		case 500: return "Internal Server Error";
+		case 502: return "Bad Gateway";
+		case 504: return "Gateway Timeout";
 		default: return "Unknown Status Code";
 	}
 }
@@ -100,19 +102,11 @@ Response ResponseBuilder::buildErrorResponse(int statusCode, const ServerConfig&
 			return response;
 		}
 	}
-	response.statusCode = 500;
-	response.reasonPhrase = getReasonPhrase(500);
-	if(getSource(serverConfig.root + "/500.html", response.body))
-	{
-		response.headers["Content-Length"] = std::to_string(response.body.size());
-		return response;
-	}
-	else
-	{
-		response.body = "<html><body><h1>500 Internal Server Error</h1></body></html>";
-		response.headers["Content-Length"] = std::to_string(response.body.size());
-		return response;
-	}
+	// A missing custom page must not turn a CGI 502/504 (or another error) into 500.
+	response.body = "<html><body><h1>" + std::to_string(statusCode) + " "
+		+ response.reasonPhrase + "</h1></body></html>";
+	response.headers["Content-Length"] = std::to_string(response.body.size());
+	return response;
 }
 
 Response ResponseBuilder::buildStaticResponse(const std::string& filePath, const ServerConfig& serverConfig)

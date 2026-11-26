@@ -61,6 +61,18 @@ void Client::handleErrorResponse(const ServerConfig& sc, HttpStatus code)
 	_response = _builder.buildErrorResponse(static_cast<int>(_request.httpStatus), sc);
 	_state = RESPONSE_READY;
 }
+//TODO::Gita add this 
+void Client::handleCGI(const ServerConfig& serverConfig, const LocationConfig& lc, const std::string& scriptPath)
+{
+	if (!_cgi.start(_request, lc, scriptPath))
+		return handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
+
+	_cgiPipesRegistered = false;
+	_state = CGI_RUNNING;
+	Logger::debug("CGI started for script: " + scriptPath);
+}
+
+//TODO::Gita add this 
 /**
  * @brief Checks whether an entry inside a directory is itself a directory.
  *
@@ -125,6 +137,22 @@ bool readDirectoryEntries(DIR* dir, const std::string& fullPath, std::vector<std
 	}
 	return true;
 }
+
+void Client::handleDirectoryOpenError(const ServerConfig& serverConfig)
+{
+	int saveErr = errno;
+
+	if (saveErr == EACCES || saveErr == ELOOP)
+		handleErrorResponse(serverConfig, FORBIDDEN);
+	else if (saveErr == ENOENT || saveErr == ENOTDIR)
+		handleErrorResponse(serverConfig, PAGE_NOT_FOUND);
+	else
+		handleErrorResponse(serverConfig, INTERNAL_SERVER_ERR);
+}
+
+
+
+
 
 /**
  * @brief Generates an autoindex response for a directory.

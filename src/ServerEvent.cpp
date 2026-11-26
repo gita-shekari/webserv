@@ -45,6 +45,16 @@ void	Server::processClientRequest(pollfd& pfd, Client& client)
 		//	_pollfds.push_back(client.getPipefd());
 		//}
 	}
+	/////////TODO: Gita add this
+	if (client.getState() == CGI_RUNNING && !client.getCgiPipesRegistered())
+	{
+		// Adding pipes can reallocate _pollfds: do not use pfd again afterward.
+		pfd.events = 0;
+		registerCgiPipes(client);
+		return;
+	}
+	//////
+
 	if (client.getState() == RESPONSE_READY)
 	{
 		client.prepareResponseForSending();
@@ -108,6 +118,12 @@ void Server::handleClientEvent(pollfd& pfd, short& revents, Client& client)
 			return ; // continue the loop
 
 		pfd.events &= ~POLLOUT;
+		/////// TODO: gita add this
+		// CGI responses use Connection: close; close only after the full buffer is sent.
+		if (client.getCgiPipesRegistered())
+			markForClose(client.getFd());
+
+		///////
 		if (client.getIsMarkedForClose())
 			return ;
 		if (client.getPeerReadClosed())
@@ -125,48 +141,48 @@ void Server::handleClientEvent(pollfd& pfd, short& revents, Client& client)
 	processClientRequest(pfd, client);
 }
 
-void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
-{
-	if (revents & POLLNVAL)
-	{
-		// server side pipefd is closed. but still in pollfds. 
-		// log and cleanCGI, remove from pollfds.
-		/**
-		 * cgistdout -> piperead cannot read from cgi anymore. fd is closed.
-		 * cgistdin -> pipewrite cannot write to cgi anymore. fd is closed.
-		 */ 
-		return ;
-	}
-	if (revents & POLLERR)
-	{
-		// if CGI stdin closed, write end report POLLERR
-		// log, stop writing -> remove from pollfds and close write-end -> continue receiving cgistdout and cgi result.
-		/**
-		 * cgistdout -> piperead errors, check the result of read()
-		 * cgistdin -> is closed pipewrite cannot write into it anymore.  
-		 */
-	}
-	if (revents & POLLHUP)
-	{
-		/** if CGI stdout closed, read end report POLLHUP, need to keep reading until read() = 0, EOF
-		 * cgtstdin -> we closed write to cgi. 
-		 * 
-		*/
- 	}
-	if (revents & (POLLIN | POLLHUP))
-	{
-		// read() from pipe. 
-		/**
-		 * read() > 0: save output and wait to read more
-		 * read() == 0: EOF, remove from pollfds and close readend.
-		 * read() < 0: EAGAIN / EINTR, continue, for next round. other deadful error: CGI failure and cleanup. 
- 		 */
-	}
+//void Server::handleCgiPipeEvent(pollfd& pfd, short& revents)
+//{
+//	if (revents & POLLNVAL)
+//	{
+//		// server side pipefd is closed. but still in pollfds. 
+//		// log and cleanCGI, remove from pollfds.
+//		/**
+//		 * cgistdout -> piperead cannot read from cgi anymore. fd is closed.
+//		 * cgistdin -> pipewrite cannot write to cgi anymore. fd is closed.
+//		 */ 
+//		return ;
+//	}
+//	if (revents & POLLERR)
+//	{
+//		// if CGI stdin closed, write end report POLLERR
+//		// log, stop writing -> remove from pollfds and close write-end -> continue receiving cgistdout and cgi result.
+//		/**
+//		 * cgistdout -> piperead errors, check the result of read()
+//		 * cgistdin -> is closed pipewrite cannot write into it anymore.  
+//		 */
+//	}
+//	if (revents & POLLHUP)
+//	{
+//		/** if CGI stdout closed, read end report POLLHUP, need to keep reading until read() = 0, EOF
+//		 * cgtstdin -> we closed write to cgi. 
+//		 * 
+//		*/
+// 	}
+//	if (revents & (POLLIN | POLLHUP))
+//	{
+//		// read() from pipe. 
+//		/**
+//		 * read() > 0: save output and wait to read more
+//		 * read() == 0: EOF, remove from pollfds and close readend.
+//		 * read() < 0: EAGAIN / EINTR, continue, for next round. other deadful error: CGI failure and cleanup. 
+// 		 */
+//	}
 
-	Client& client = getBelongedClient(pfd.fd);
-	//client.checkPIDprocess();
-	// TODO:: check whether the pipe is finished.
-	// this function will change client state to RESPONSE_READY or keep it as CGI_RUNNING.
-	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY.
+//	Client& client = getBelongedClient(pfd.fd);
+//	//client.checkPIDprocess();
+//	// TODO:: check whether the pipe is finished.
+//	// this function will change client state to RESPONSE_READY or keep it as CGI_RUNNING.
+//	// in routing, handleCGI() will change client status to CGI_RUNNING or error happened before setting up process, it will give handleErrorResponse(), which switch the state to RESPONSE_READY.
 
-}
+//}

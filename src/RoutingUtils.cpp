@@ -38,6 +38,18 @@ std::string RoutingUtils::getCorrectFullPath(const ServerConfig& sc, const Locat
 	return joinPath(sc.root, reqPath);
 }
 
+/**
+ * @brief Checks whether a requested file should be handled as CGI.
+ *
+ * Extracts the file extension from the path and compares it with
+ * the CGI extension configured for the matched location.
+ *
+ * @param lc    Matched location configuration.
+ * @param path  Filesystem path of the requested file.
+ *
+ * @return true if the file extension matches the configured CGI extension,
+ * otherwise false.
+ */
 bool RoutingUtils::isCGI(const LocationConfig& lc, const std::string& path)
 {
 	std::string ext;
