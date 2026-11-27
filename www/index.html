@@ -194,7 +194,7 @@
             </li>
         </ul>
 
-        <form action="/cgi-bin/post_test.py" method="POST">
+        <form action="/cgi-bin/test.py" method="POST">
             <label>
                 Message:
                 <input type="text" name="message" value="Hello from Webserv">
@@ -206,8 +206,8 @@
         </form>
 
         <p>
-            If CGI is still not implemented, expected:
-            <code>501 Not Implemented</code>
+            Expected: <code>200 OK</code> with the request method, query string,
+            and submitted body displayed by the Python script.
         </p>
     </div>
 
